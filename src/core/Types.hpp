@@ -58,7 +58,8 @@ enum class ConstraintType : std::uint8_t {
     Hinge    = 2,
     Slider   = 3,
     Distance = 4,
-    Cone     = 5
+    Cone     = 5,
+    SwingTwist = 6
 };
 
 enum class ContactEventType : std::uint8_t {

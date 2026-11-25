@@ -6,6 +6,7 @@
 #include <Jolt/Physics/Constraints/HingeConstraint.h>
 #include <Jolt/Physics/Constraints/PointConstraint.h>
 #include <Jolt/Physics/Constraints/SliderConstraint.h>
+#include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 #include <cmath>
 
 namespace CPH {
@@ -128,6 +129,38 @@ JPH::Constraint *CreateSlider(const ConstraintParams &p, JPH::Body &body1, JPH::
     return s.Create(body1, body2);
 }
 
+// Ragdoll joint: ball joint at the pivot whose swing is limited by an elliptical cone
+// (normal / plane half angles) and whose twist about the twist axis is limited to
+// [twist min, twist max]. All in world space at creation, like the other joints.
+JPH::Constraint *CreateSwingTwist(const ConstraintParams &p, JPH::Body &body1,
+                                  JPH::Body &body2) {
+    JPH::SwingTwistConstraintSettings s;
+    s.mSpace     = JPH::EConstraintSpace::WorldSpace;
+    s.mPosition1 = JPH::RVec3(p.px, p.py, p.pz);
+    s.mPosition2 = s.mPosition1;
+
+    JPH::Vec3 twist(p.ax, p.ay, p.az);
+    if (twist.LengthSq() < kCcfTinyEpsilon) {
+        twist = JPH::Vec3::sAxisY();
+    }
+    twist = twist.Normalized();
+    // Plane axis must be perpendicular to the twist axis.
+    JPH::Vec3 plane(p.nx, p.ny, p.nz);
+    plane = plane - twist * twist.Dot(plane);
+    if (plane.LengthSq() < kCcfTinyEpsilon) {
+        plane = twist.GetNormalizedPerpendicular();
+    }
+    plane = plane.Normalized();
+
+    s.mTwistAxis1 = s.mTwistAxis2 = twist;
+    s.mPlaneAxis1 = s.mPlaneAxis2 = plane;
+    s.mNormalHalfConeAngle = p.halfConeAngle;
+    s.mPlaneHalfConeAngle  = p.planeHalfConeAngle;
+    s.mTwistMinAngle       = p.limitMin;
+    s.mTwistMaxAngle       = p.limitMax;
+    return s.Create(body1, body2);
+}
+
 JPH::Constraint *CreateCone(const ConstraintParams &p, JPH::Body &body1, JPH::Body &body2) {
     JPH::ConeConstraintSettings s;
     s.mPoint1 = JPH::RVec3(p.px, p.py, p.pz);
@@ -188,6 +221,8 @@ JPH::Constraint *CreateConstraint(ConstraintType type, const ConstraintParams &p
         return CreateCone(params, body1, body2);
     case ConstraintType::Distance:
         return CreateDistance(params, body1, body2);
+    case ConstraintType::SwingTwist:
+        return CreateSwingTwist(params, body1, body2);
     default:
         return nullptr;
     }

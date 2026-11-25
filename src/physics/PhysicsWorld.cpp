@@ -21,6 +21,12 @@ namespace {
 constexpr std::size_t kCommandQueueInitialCapacity = 64;
 constexpr std::size_t kInitialBodyCapacity         = 1024;
 constexpr std::size_t kConstraintInitialCapacity   = 256;
+
+// Constraint slots scale with the body limit (a ragdoll has about one joint per
+// body); 256 stays the minimum.
+constexpr std::size_t ConstraintCapacity(std::size_t max_bodies) {
+    return max_bodies > kConstraintInitialCapacity ? max_bodies : kConstraintInitialCapacity;
+}
 constexpr std::size_t kContactMaxCapacity          = sizeof(ContactEvent) * 8 << 5;
 
 constexpr JPH::Real kVerifyAbiPosX    = 10.0;
@@ -275,8 +281,8 @@ std::expected<void, Error> PhysicsWorld::AllocateBuffers(int max_bodies,
         !joltBodyPtrs.allocate(maxJoltBodies + 1) ||
         !commandQueue.allocate(kCommandQueueInitialCapacity) ||
         !commandQueueSpare.allocate(kCommandQueueInitialCapacity) ||
-        !constraints.allocate(kConstraintInitialCapacity) ||
-        !freeConstraintSlots.allocate(kConstraintInitialCapacity)) {
+        !constraints.allocate(ConstraintCapacity(max_capacity)) ||
+        !freeConstraintSlots.allocate(ConstraintCapacity(max_capacity))) {
         return std::unexpected(WorldError::OutOfMemory);
     }
 
@@ -294,10 +300,11 @@ std::expected<void, Error> PhysicsWorld::AllocateBuffers(int max_bodies,
         bodies.masks[i]      = kAllLayerBits;
         bodies.bodyIds[i]   = JPH::BodyID(); // default ctor == cInvalidBodyID
     }
-    for (std::uint32_t i = 0; i < kConstraintInitialCapacity; ++i) {
+    const std::size_t constraint_capacity = ConstraintCapacity(max_capacity);
+    for (std::uint32_t i = 0; i < constraint_capacity; ++i) {
         freeConstraintSlots[i] = i;
     }
-    freeConstraintCount = kConstraintInitialCapacity;
+    freeConstraintCount = static_cast<std::uint32_t>(constraint_capacity);
     return {};
 }
 

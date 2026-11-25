@@ -57,6 +57,7 @@ void ParseBodySize(Borrowed py_size, float size[4]);
 [[nodiscard]] ParseResult ParseHingeParams(Borrowed args, ConstraintParams &params);
 [[nodiscard]] ParseResult ParseSliderParams(Borrowed args, ConstraintParams &params);
 [[nodiscard]] ParseResult ParseConeParams(Borrowed args, ConstraintParams &params);
+[[nodiscard]] ParseResult ParseSwingTwistParams(Borrowed args, ConstraintParams &params);
 [[nodiscard]] ParseResult ParseDistanceParams(Borrowed args, ConstraintParams &params);
 
 // --- Tracked-vehicle tracks ------------------------------------------------

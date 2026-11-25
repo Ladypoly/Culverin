@@ -242,6 +242,20 @@ ParseResult ParseConeParams(Borrowed args, ConstraintParams &params) {
     return {};
 }
 
+ParseResult ParseSwingTwistParams(Borrowed args, ConstraintParams &params) {
+    if (!args) {
+        return {};
+    }
+    // (Pivot), (TwistAxis), (PlaneAxis), NormalHalfCone, PlaneHalfCone, TwistMin, TwistMax
+    if (PyArg_ParseTuple(args, "(fff)(fff)(fff)ffff", &params.px, &params.py, &params.pz,
+                         &params.ax, &params.ay, &params.az, &params.nx, &params.ny, &params.nz,
+                         &params.halfConeAngle, &params.planeHalfConeAngle, &params.limitMin,
+                         &params.limitMax) == 0) {
+        return CaptureFailure();
+    }
+    return {};
+}
+
 ParseResult ParseDistanceParams(Borrowed args, ConstraintParams &params) {
     // Default: -1.0 can be used as a sentinel in create_distance
     // logic to say "calculate distance from current positions"

@@ -3313,6 +3313,38 @@ class TestSoftBodies(CulverinTestCase):
         # The pinned vertex (2) should be physically higher than the mobile ones
         self.assertGreater(verts[2, 1], verts[0, 1], "Pinned vertex fell below bottom vertex")
 
+    def test_swing_twist_ragdoll_chain(self) -> None:
+        """CONSTRAINT_SWING_TWIST + constraint slots scale with max_bodies (pd2.5).
+
+        A 300-link chain needs more than the old fixed 256 constraint slots; a twisted
+        link stays within its twist limit."""
+        world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 1024})
+        links = []
+        for i in range(301):
+            links.append(world.create_body(pos=(i * 0.2, 5.0, 0), rot=(0, 0, 0, 1), size=(0.08, 0.04, 0.04),
+                                           shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC))
+        world.step(0)
+        joints = []
+        for i in range(1, len(links)):
+            pivot = (i * 0.2 - 0.1, 5.0, 0.0)
+            joints.append(world.create_constraint(culverin.CONSTRAINT_SWING_TWIST, links[i - 1], links[i],
+                                                  params=(pivot, (1, 0, 0), (0, 1, 0), 0.5, 0.5, -0.2, 0.2)))
+        self.assertEqual(len(joints), 300)
+        # twist the last link hard about the chain axis; the limit must hold
+        world.set_angular_velocity(links[-1], 40.0, 0.0, 0.0)
+        for _ in range(60):
+            world.step(1 / 120.0)
+        qx, qy, qz, qw = world.get_rotation(links[-1])
+        px, py, pz, pw = world.get_rotation(links[-2])
+        # relative rotation angle about x between the last two links
+        rel_w = pw * qw + px * qx + py * qy + pz * qz
+        rel_x = pw * qx - px * qw - py * qz + pz * qy
+        twist = abs(2 * np.arctan2(rel_x, rel_w))
+        twist = min(twist, 2 * np.pi - twist)
+        self.assertLess(twist, 0.2 + 0.15, f"twist {twist:.3f} rad exceeds the 0.2 rad limit")
+        bx, by, bz = world.get_position(links[150])
+        self.assertTrue(np.isfinite(by) and by < 5.0, "chain should hang and stay finite")
+
     def test_compound_hull_cup(self) -> None:
         """create_compound_hull: a ball dropped into a 5-slab cup stays inside it (pd2.4)."""
         world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 16})

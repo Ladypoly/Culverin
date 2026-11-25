@@ -519,6 +519,7 @@ static int InitConstants(PyObject *m) {
                   {.name = "CONSTRAINT_SLIDER", .value = std::to_underlying(ConstraintType::Slider)},
                   {.name = "CONSTRAINT_DISTANCE", .value = std::to_underlying(ConstraintType::Distance)},
                   {.name = "CONSTRAINT_CONE", .value = std::to_underlying(ConstraintType::Cone)},
+                  {.name = "CONSTRAINT_SWING_TWIST", .value = std::to_underlying(ConstraintType::SwingTwist)},
                   {.name = "EVENT_ADDED", .value = std::to_underlying(ContactEventType::Added)},
                   {.name = "EVENT_PERSISTED", .value = std::to_underlying(ContactEventType::Persisted)},
                   {.name = "EVENT_REMOVED", .value = std::to_underlying(ContactEventType::Removed)},

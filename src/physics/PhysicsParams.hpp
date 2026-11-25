@@ -51,6 +51,9 @@ struct ConstraintParams {
     float limitMin       = -std::numeric_limits<float>::max();
     float limitMax       = std::numeric_limits<float>::max();
     float halfConeAngle = 0.0F;
+    // Swing-twist: plane axis (perpendicular to the twist axis) and its half cone.
+    float nx = 1.0F, ny = 0.0F, nz = 0.0F;
+    float planeHalfConeAngle = 0.0F;
     bool hasMotor        = false;
     int motorType        = 0;
     float motorTarget    = 0.0F;

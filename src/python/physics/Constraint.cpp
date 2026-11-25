@@ -72,6 +72,9 @@ void ActivateBody(JPH::BodyInterface &bi, JPH::Body *body) {
     case std::to_underlying(ConstraintType::Distance):
         parse_result = ParseDistanceParams(o_params, p);
         break;
+    case std::to_underlying(ConstraintType::SwingTwist):
+        parse_result = ParseSwingTwistParams(o_params, p);
+        break;
     default:
         PyErr_SetString(PyExc_ValueError, "Unknown constraint type");
         return nullptr;
