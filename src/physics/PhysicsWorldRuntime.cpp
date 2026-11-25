@@ -414,6 +414,63 @@ PhysicsWorld::GetSoftBodyLocalVertices(BodyHandle handle) {
         });
 }
 
+std::expected<std::uint32_t, Error> PhysicsWorld::CreateGroupFilter(std::uint32_t sub_groups) {
+    if (sub_groups == 0 || sub_groups > 65536) {
+        return std::unexpected(WorldRuntimeError::InvalidArgument);
+    }
+    auto shadow = LockShadowNotStepping();
+    groupFilters.push_back(new JPH::GroupFilterTable(sub_groups));
+    groupFilterSizes.push_back(sub_groups);
+    return static_cast<std::uint32_t>(groupFilters.size() - 1);
+}
+
+std::expected<void, Error>
+PhysicsWorld::GroupFilterDisableCollision(std::uint32_t filter, std::uint32_t a, std::uint32_t b) {
+    auto shadow = LockShadowNotStepping();
+    if (filter >= groupFilters.size()) {
+        return std::unexpected(WorldRuntimeError::OutOfRange);
+    }
+    const std::uint32_t size = groupFilterSizes[filter];
+    if (a >= size || b >= size || a == b) {
+        return std::unexpected(WorldRuntimeError::OutOfRange);
+    }
+    groupFilters[filter]->DisableCollision(a, b);
+    return {};
+}
+
+std::expected<void, Error> PhysicsWorld::SetCollisionGroup(BodyHandle handle, std::uint32_t filter,
+                                                           std::uint32_t group,
+                                                           std::uint32_t sub_group) {
+    if (!joltInitialized) {
+        return std::unexpected(WorldRuntimeError::InvalidArgument);
+    }
+    JPH::BodyID body_id;
+    JPH::Ref<JPH::GroupFilterTable> table;
+    {
+        auto shadow = LockShadowNotStepping();
+        if (filter >= groupFilters.size() || sub_group >= groupFilterSizes[filter]) {
+            return std::unexpected(WorldRuntimeError::OutOfRange);
+        }
+        table = groupFilters[filter];
+        const std::optional<std::uint32_t> resolved = Resolve(handle);
+        if (!resolved) {
+            return std::unexpected(WorldRuntimeError::StaleHandle);
+        }
+        const std::uint32_t slot = *resolved;
+        const uint8_t state = (bodies.slotStates[slot]).load(std::memory_order::acquire);
+        if (!GetSlotPredicate(state, kMaskImmStrict).isImmediate) {
+            return std::unexpected(WorldRuntimeError::StaleHandle);
+        }
+        body_id = bodies.bodyIds[bodies.slotToDense[slot]];
+    }
+    const JPH::BodyLockWrite lock(physicsSystem.GetBodyLockInterface(), body_id);
+    if (!lock.Succeeded()) {
+        return std::unexpected(WorldRuntimeError::StaleHandle);
+    }
+    lock.GetBody().SetCollisionGroup(JPH::CollisionGroup(table.GetPtr(), group, sub_group));
+    return {};
+}
+
 std::expected<void, Error>
 PhysicsWorld::SetSoftBodyVertices(BodyHandle handle, std::span<const std::uint32_t> indices,
                                   std::span<const float> positions,

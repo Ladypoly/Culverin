@@ -3313,6 +3313,28 @@ class TestSoftBodies(CulverinTestCase):
         # The pinned vertex (2) should be physically higher than the mobile ones
         self.assertGreater(verts[2, 1], verts[0, 1], "Pinned vertex fell below bottom vertex")
 
+    def test_collision_group_filter(self) -> None:
+        """Group filter (pd2.5): two overlapping boxes in the same group with their pair
+        disabled pass through each other; a third box in the group still collides."""
+        world = culverin.PhysicsWorld(settings={"gravity": (0, 0, 0), "max_bodies": 16})
+        a = world.create_body(pos=(0, 0, 0), rot=(0, 0, 0, 1), size=(0.5, 0.5, 0.5),
+                              shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC)
+        b = world.create_body(pos=(0.6, 0, 0), rot=(0, 0, 0, 1), size=(0.5, 0.5, 0.5),
+                              shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC)
+        c = world.create_body(pos=(-0.6, 0, 0), rot=(0, 0, 0, 1), size=(0.5, 0.5, 0.5),
+                              shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC)
+        world.step(0)
+        f = world.create_group_filter(3)
+        world.group_filter_disable_collision(f, 0, 1)
+        for h, sub in ((a, 0), (b, 1), (c, 2)):
+            world.set_collision_group(h, f, 7, sub)
+        for _ in range(30):
+            world.step(1 / 60.0)
+        self.assertLess(abs(world.get_position(b)[0] - 0.6), 0.01, "a/b pair was disabled but pushed apart")
+        self.assertLess(world.get_position(c)[0], -0.65, "a/c overlap should still be resolved")
+        with self.assertRaises(IndexError):
+            world.group_filter_disable_collision(f, 0, 5)
+
     def test_swing_twist_ragdoll_chain(self) -> None:
         """CONSTRAINT_SWING_TWIST + constraint slots scale with max_bodies (pd2.5).
 

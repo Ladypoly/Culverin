@@ -45,6 +45,13 @@ struct WorldParsers {
            Arg<"positions", PyObject *, false>, Arg<"velocities", PyObject *, false>,
            Arg<"inv_masses", PyObject *, false>>
         setSoftVerts{catalog};
+    Parser<"GroupFilterNew", Arg<"sub_groups", uint32_t, true>> groupFilterNew{catalog};
+    Parser<"GroupFilterDisable", Arg<"filter", uint32_t, true>, Arg<"a", uint32_t, true>,
+           Arg<"b", uint32_t, true>>
+        groupFilterDisable{catalog};
+    Parser<"SetCollisionGroup", Arg<"handle", ParseBodyHandle, true>, Arg<"filter", uint32_t, true>,
+           Arg<"group", uint32_t, true>, Arg<"sub_group", uint32_t, true>>
+        setCollisionGroup{catalog};
     Parser<"Destroy", Arg<"handle", ParseBodyHandle, true>> destroy{catalog};
     Parser<"Activate", Arg<"handle", ParseBodyHandle, true>> activate{catalog};
     Parser<"Gravity", Arg<"x", float, true>, Arg<"y", float, true>, Arg<"z", float, true>> gravity{

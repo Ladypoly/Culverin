@@ -2345,6 +2345,64 @@ WorldGetSoftBodyLocalVertices(PhysicsWorldObject *self, PyObject *const *args,
         static_cast<Py_ssize_t>(positions.size() * sizeof(JPH::Float3)));
 }
 
+[[nodiscard]] PyObject * WorldCreateGroupFilter(PhysicsWorldObject *self, PyObject *const *args,
+                                                size_t nargsf, PyObject *kwnames) {
+    uint32_t sub_groups = 0;
+    const ParseResult parsed =
+        self->parsers->groupFilterNew.Parse(args, PyVectorcall_NARGS(nargsf), kwnames, sub_groups);
+    if (!parsed) {
+        RaiseParseError(parsed.error());
+        return nullptr;
+    }
+    const std::expected<std::uint32_t, Error> status = self->physics.CreateGroupFilter(sub_groups);
+    if (!status) {
+        return PyErr_Format(PyExc_ValueError, "sub_groups must be 1..65536");
+    }
+    return PyLong_FromUnsignedLong(*status);
+}
+
+[[nodiscard]] PyObject * WorldGroupFilterDisableCollision(PhysicsWorldObject *self,
+                                                          PyObject *const *args, size_t nargsf,
+                                                          PyObject *kwnames) {
+    uint32_t filter = 0;
+    uint32_t a      = 0;
+    uint32_t b      = 0;
+    const ParseResult parsed = self->parsers->groupFilterDisable.Parse(
+        args, PyVectorcall_NARGS(nargsf), kwnames, filter, a, b);
+    if (!parsed) {
+        RaiseParseError(parsed.error());
+        return nullptr;
+    }
+    const std::expected<void, Error> status = self->physics.GroupFilterDisableCollision(filter, a, b);
+    if (!status) {
+        return PyErr_Format(PyExc_IndexError, "unknown filter or sub group out of range");
+    }
+    Py_RETURN_NONE;
+}
+
+[[nodiscard]] PyObject * WorldSetCollisionGroup(PhysicsWorldObject *self, PyObject *const *args,
+                                                size_t nargsf, PyObject *kwnames) {
+    uint64_t handle_raw = 0;
+    uint32_t filter     = 0;
+    uint32_t group      = 0;
+    uint32_t sub_group  = 0;
+    const ParseResult parsed = self->parsers->setCollisionGroup.Parse(
+        args, PyVectorcall_NARGS(nargsf), kwnames, handle_raw, filter, group, sub_group);
+    if (!parsed) {
+        RaiseParseError(parsed.error());
+        return nullptr;
+    }
+    std::expected<void, Error> status;
+    {
+        const AllowThreads allow;
+        status = self->physics.SetCollisionGroup(BodyHandle(handle_raw), filter, group, sub_group);
+    }
+    if (!status) {
+        return RuntimeStatusError(status.error(), nullptr);
+    }
+    Py_RETURN_NONE;
+}
+
 [[nodiscard]] PyObject *
 WorldSetSoftBodyVertices(PhysicsWorldObject *self, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames) {
@@ -2944,6 +3002,9 @@ static PyMethodDef kPhysicsWorldMethods[] = {
     CPH::Python::FastCallMethod("get_soft_body_vertices", WorldGetSoftBodyVertices),
     CPH::Python::FastCallMethod("get_soft_body_vertex_count", WorldGetSoftBodyVertexCount),
     CPH::Python::FastCallMethod("set_soft_body_vertices", WorldSetSoftBodyVertices),
+    CPH::Python::FastCallMethod("create_group_filter", WorldCreateGroupFilter),
+    CPH::Python::FastCallMethod("group_filter_disable_collision", WorldGroupFilterDisableCollision),
+    CPH::Python::FastCallMethod("set_collision_group", WorldSetCollisionGroup),
     CPH::Python::FastCallMethod("get_soft_body_vertex_position",
                                 WorldGetSoftBodyVertexPosition),
     CPH::Python::FastCallMethod("get_soft_body_local_vertices",

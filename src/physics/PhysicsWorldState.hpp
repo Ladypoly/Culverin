@@ -22,6 +22,7 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
+#include <Jolt/Physics/Collision/GroupFilterTable.h>
 #include <Jolt/Physics/Constraints/Constraint.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Ragdoll/Ragdoll.h>
@@ -295,6 +296,14 @@ struct PhysicsWorld {
     // Overwrites selected vertices of a soft body (world-space positions and
     // velocities, inverse masses); empty spans leave that field alone. Indices
     // are validated before anything is written. Wakes the body.
+    // Collision groups (Jolt GroupFilterTable): bodies of one group (e.g. a ragdoll)
+    // skip the sub-group pairs disabled in their filter; everything else collides.
+    [[nodiscard]] std::expected<std::uint32_t, Error> CreateGroupFilter(std::uint32_t sub_groups);
+    [[nodiscard]] std::expected<void, Error>
+    GroupFilterDisableCollision(std::uint32_t filter, std::uint32_t a, std::uint32_t b);
+    [[nodiscard]] std::expected<void, Error>
+    SetCollisionGroup(BodyHandle handle, std::uint32_t filter, std::uint32_t group,
+                      std::uint32_t sub_group);
     [[nodiscard]] std::expected<void, Error>
     SetSoftBodyVertices(BodyHandle handle, std::span<const std::uint32_t> indices,
                         std::span<const float> positions, std::span<const float> velocities,
@@ -383,6 +392,10 @@ struct PhysicsWorld {
     // (step_sync lives in the block above). See core/Threading.hpp.
     std::mutex shadowLock;
     std::mutex jphTrampolineLock;
+
+    // Collision group filters (create_group_filter): index = filter id.
+    JPH::Array<JPH::Ref<JPH::GroupFilterTable>> groupFilters;
+    JPH::Array<std::uint32_t> groupFilterSizes;
 
     Buffer<PhysicsCommand> commandQueue;
     Buffer<PhysicsCommand> commandQueueSpare;
