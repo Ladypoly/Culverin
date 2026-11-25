@@ -3313,6 +3313,40 @@ class TestSoftBodies(CulverinTestCase):
         # The pinned vertex (2) should be physically higher than the mobile ones
         self.assertGreater(verts[2, 1], verts[0, 1], "Pinned vertex fell below bottom vertex")
 
+    def test_compound_hull_cup(self) -> None:
+        """create_compound_hull: a ball dropped into a 5-slab cup stays inside it (pd2.4)."""
+        world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 16})
+        world.create_body(pos=(0, -0.5, 0), rot=(0, 0, 0, 1), size=(5, 0.5, 5),
+                          shape=culverin.SHAPE_BOX, motion=culverin.MOTION_STATIC)
+
+        def slab(lo, hi):
+            return [[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+
+        w, h, t = 0.5, 0.6, 0.05             # half width, height, wall thickness
+        slabs = [slab((-w, 0, -w), (w, t, w)),                       # bottom
+                 slab((-w, 0, -w), (-w + t, h, w)), slab((w - t, 0, -w), (w, h, w)),
+                 slab((-w, 0, -w), (w, h, -w + t)), slab((-w, 0, w - t), (w, h, w))]
+        pts = np.array([p for s in slabs for p in s], dtype=np.float32)
+        counts = np.array([8] * len(slabs), dtype=np.uint32)
+        cup = world.create_compound_hull((0, 0.0, 0), (0, 0, 0, 1), pts.tobytes(), counts.tobytes(),
+                                         motion=culverin.MOTION_DYNAMIC, convex_radius=0.0)
+        ball = world.create_body(pos=(0, 2.0, 0), rot=(0, 0, 0, 1), size=0.15,
+                                 shape=culverin.SHAPE_SPHERE, motion=culverin.MOTION_DYNAMIC)
+        for _ in range(240):
+            world.step(1 / 120.0)
+        # The cup stands on the ground (top at y = 0) with its origin at the bottom; the
+        # body position may be its centre of mass, so check in world space.
+        bx, by, bz = world.get_position(ball)
+        cx, cy, cz = world.get_position(cup)
+        self.assertLess(abs(cx) + abs(cz), 0.3, f"cup moved or tipped ({cx:.3f}, {cz:.3f})")
+        self.assertLess(by, h, f"ball not inside the cup (ball y {by:.3f})")
+        self.assertGreater(by, t + 0.1, f"ball fell through the cup bottom (ball y {by:.3f})")
+        self.assertLess(max(abs(bx), abs(bz)), w, "ball left the cup sideways")
+
+        with self.assertRaises(ValueError):
+            world.create_compound_hull((0, 0, 0), (0, 0, 0, 1), pts.tobytes(),
+                                       np.array([8, 8], dtype=np.uint32).tobytes())
+
     def test_soft_body_bend_compliance(self) -> None:
         """create_constraints(bend_compliance=...): a stiff strip droops less than a free one (pd2.3)."""
         dtype = np.float64 if culverin.USE_DOUBLE_PRECISION else np.float32

@@ -296,6 +296,24 @@ class PhysicsWorld:
         ccd: bool = False,
         convex_radius: float = -1.0,
     ) -> int: ...
+    def create_compound_hull(
+        self,
+        pos: Vec3,
+        rot: Quat,
+        points: Buffer,
+        counts: Buffer,
+        motion: int = 2,
+        mass: float = -1.0,
+        user_data: int = 0,
+        is_sensor: bool = False,
+        category: int = 0xFFFF,
+        mask: int = 0xFFFF,
+        material_id: int = 0,
+        friction: float = 0.2,
+        restitution: float = 0.0,
+        ccd: bool = False,
+        convex_radius: float = -1.0,
+    ) -> int: ...
     def create_compound_body(
         self,
         pos: Vec3,

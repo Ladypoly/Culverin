@@ -504,6 +504,67 @@ static JPH::ShapeRefC CreateCompoundShape(PhysicsWorld &world,
 }
 
 std::expected<BodyHandle, Error>
+PhysicsWorld::CreateCompoundHull(std::span<const float> points,
+                                 std::span<const std::uint32_t> counts,
+                                 const PhysicsWorldBodyCreateRequest &request,
+                                 float max_convex_radius) {
+    if (counts.empty() || points.size() % 3 != 0) {
+        return std::unexpected(WorldCreationError::InvalidArgument);
+    }
+    std::size_t total = 0;
+    for (const std::uint32_t count : counts) {
+        total += count;
+    }
+    if (total * 3 != points.size()) {
+        return std::unexpected(WorldCreationError::InvalidArgument);
+    }
+
+    const float radius = max_convex_radius >= 0.0f ? max_convex_radius : kConvexHullTolerance;
+    JPH::StaticCompoundShapeSettings compound_settings;
+    JPH::Array<JPH::Vec3> hull_points;
+    std::size_t offset = 0;
+    std::size_t built  = 0;
+    for (const std::uint32_t count : counts) {
+        const std::size_t first = offset;
+        offset += count;
+        if (count < 4) {
+            continue;  // a hull needs volume
+        }
+        hull_points.resize(count);
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const std::size_t k = (first + i) * 3;
+            hull_points[i]      = JPH::Vec3(points[k], points[k + 1], points[k + 2]);
+        }
+        const JPH::ConvexHullShapeSettings hull_settings(hull_points, radius);
+        const auto hull_result = hull_settings.Create();
+        if (!hull_result.IsValid()) {
+            continue;
+        }
+        compound_settings.AddShape(JPH::Vec3::sZero(), JPH::Quat::sIdentity(),
+                                   hull_result.Get().GetPtr(), 0);
+        ++built;
+    }
+    if (built == 0) {
+        return std::unexpected(WorldCreationError::ShapeFailed);
+    }
+    const auto shape_result = [&] {
+        const std::scoped_lock trampoline(jphTrampolineLock);
+        return compound_settings.Create();
+    }();
+    if (!shape_result.IsValid()) {
+        return std::unexpected(WorldCreationError::ShapeFailed);
+    }
+    const JPH::ShapeRefC shape = shape_result.Get();
+
+    const uint32_t object_layer =
+        request.config.motionType == std::to_underlying(MotionType::Static) ? std::to_underlying(ObjectLayer::Static) : std::to_underlying(ObjectLayer::Dynamic);
+    return CreateBodyFromShape(
+        *this, shape.GetPtr(), request,
+        static_cast<JPH::EMotionType>(request.config.motionType), object_layer,
+        BodySetup::Configured);
+}
+
+std::expected<BodyHandle, Error>
 PhysicsWorld::CreateCompoundBody(std::span<const PhysicsWorldCompoundPart> parts,
                                    const PhysicsWorldBodyCreateRequest &request) {
     if (parts.empty()) {

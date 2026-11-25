@@ -872,6 +872,111 @@ template <PhysicsBodyOperationType OpType, auto ParserMember, FixedString Label>
     return PyLong_FromUnsignedLongLong(status->Raw());
 }
 
+// create_compound_hull(pos, rot, points, counts, ...): one body of several convex hulls.
+[[nodiscard]] static PyObject * WorldCreateCompoundHull(PhysicsWorldObject *self,
+                                                         PyObject *const *args, size_t nargsf,
+                                                         PyObject *kwnames) {
+    PyObject *o_pos      = nullptr;
+    PyObject *o_rot      = nullptr;
+    PyObject *o_points   = nullptr;
+    PyObject *o_counts   = nullptr;
+    int motion_type      = 2;
+    float mass           = -1.0f;
+    float friction       = kDefaultFriction;
+    float restitution    = 0.0f;
+    uint64_t user_data   = 0;
+    uint32_t category    = kCollisionFilterAllCategories;
+    uint32_t mask        = kCollisionFilterAllMasks;
+    uint32_t material_id = 0;
+    bool is_sensor       = false;
+    bool use_ccd         = false;
+    float convex_radius  = -1.0f;
+
+    const ParseResult parsed = self->parsers->compoundHull.Parse(
+        args, PyVectorcall_NARGS(nargsf), kwnames, o_pos, o_rot, o_points, o_counts, motion_type,
+        mass, user_data, is_sensor, category, mask, material_id, friction, restitution, use_ccd,
+        convex_radius);
+    if (!parsed) {
+        RaiseParseError(parsed.error());
+        return nullptr;
+    }
+    if (convex_radius != -1.0f && (!ValidateFinite("convex_radius", convex_radius) ||
+                                   convex_radius < 0.0f)) {
+        if (!PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError, "convex_radius must be >= 0");
+        }
+        return nullptr;
+    }
+
+    JPH::Real px;
+    JPH::Real py;
+    JPH::Real pz;
+    float rx;
+    float ry;
+    float rz;
+    float rw;
+    if (ParseResult parsed_pos = ParseVec3Into(o_pos, px, py, pz); !parsed_pos) {
+        RaiseParseError(parsed_pos.error());
+        return nullptr;
+    }
+    if (ParseResult parsed_rot = ParseQuatInto(o_rot, rx, ry, rz, rw); !parsed_rot) {
+        RaiseParseError(parsed_rot.error());
+        return nullptr;
+    }
+    if (!ValidateFinite("Position", px, py, pz) || !ValidateFinite("Rotation", rx, ry, rz, rw)) {
+        return nullptr;
+    }
+
+    const auto points_view = BufferView::Acquire(o_points);
+    if (!points_view) {
+        return nullptr;
+    }
+    if (!points_view->RequireMultipleOf(kVertexStrideBytes, "points must be float32 xyz")) [[unlikely]] {
+        return nullptr;
+    }
+    const auto counts_view = BufferView::Acquire(o_counts);
+    if (!counts_view) {
+        return nullptr;
+    }
+    if (counts_view->SizeBytes() == 0 || counts_view->SizeBytes() % sizeof(std::uint32_t) != 0) {
+        return PyErr_Format(PyExc_ValueError, "counts must be a non-empty uint32 buffer");
+    }
+    const std::span<const std::uint32_t> counts = counts_view->Uint32();
+    std::size_t total = 0;
+    for (const std::uint32_t count : counts) {
+        total += count;
+    }
+    const std::size_t num_points = points_view->SizeBytes() / kVertexStrideBytes;
+    if (total != num_points) {
+        return PyErr_Format(PyExc_ValueError, "counts add up to %zu points, points has %zu", total,
+                            num_points);
+    }
+
+    const PhysicsWorldBodyCreateRequest request = {
+        .position    = {px, py, pz},
+        .rotation    = {rx, ry, rz, rw},
+        .config      = {mass, friction, restitution, static_cast<int>(is_sensor),
+                        static_cast<int>(use_ccd), motion_type, kNoAllowedDofsOverride},
+        .category    = category,
+        .mask        = mask,
+        .materialId = material_id,
+        .userData   = user_data,
+    };
+    std::expected<BodyHandle, Error> status;
+    {
+        const AllowThreads allow;
+        status = self->physics.CreateCompoundHull(
+            {points_view->Float32().data(), num_points * 3}, counts, request, convex_radius);
+    }
+    if (!status) {
+        SetCreationError(self, status.error(), "Compound hull build failed",
+                         "Failed to create BodySettings");
+        return nullptr;
+    }
+    self->viewShape[0] = static_cast<Py_ssize_t>((self->physics.count).load(std::memory_order::relaxed));
+    return PyLong_FromUnsignedLongLong(status->Raw());
+}
+
 // Parse Python compound-part objects into a native request buffer.
 static PhysicsWorldCompoundPart *ParseCompoundParts(PyObject *parts, size_t *out_count) {
     if (!PyList_Check(parts)) {
@@ -2795,6 +2900,7 @@ static PyMethodDef kPhysicsWorldMethods[] = {
     CPH::Python::FastCallMethod("create_heightfield", WorldCreateHeightfield),
     CPH::Python::FastCallMethod("create_convex_hull", WorldCreateConvexHull),
     CPH::Python::FastCallMethod("create_compound_body", WorldCreateCompoundBody),
+    CPH::Python::FastCallMethod("create_compound_hull", WorldCreateCompoundHull),
     CPH::Python::FastCallMethod("create_soft_body", WorldCreateSoftBody),
 
     // --- Interaction ---

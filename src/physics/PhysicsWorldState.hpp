@@ -245,6 +245,14 @@ struct PhysicsWorld {
     [[nodiscard]] std::expected<BodyHandle, Error>
     CreateCompoundBody(std::span<const PhysicsWorldCompoundPart> parts,
                        const PhysicsWorldBodyCreateRequest &request);
+    // One body made of several convex hulls (concave / hollow objects). `points` is
+    // flat XYZ triples of all hulls back to back, `counts` the number of points of
+    // each hull. Hulls Jolt cannot build (degenerate) are skipped; fails only if none
+    // is left.
+    [[nodiscard]] std::expected<BodyHandle, Error>
+    CreateCompoundHull(std::span<const float> points, std::span<const std::uint32_t> counts,
+                       const PhysicsWorldBodyCreateRequest &request,
+                       float max_convex_radius = -1.0f);
     // `vertices` is flat XYZ triples, `indices` flat triangle triples.
     [[nodiscard]] std::expected<BodyHandle, Error>
     CreateMeshBody(std::span<const float> vertices, std::span<const std::uint32_t> indices,
