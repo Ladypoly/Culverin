@@ -301,7 +301,9 @@ class TestMathService(unittest.TestCase):
 
         # Unproject back to world space (using the exact depth from projection)
         unproj_pt = self.math.unproject(screen_pt, mvp, vp)
-        self.assertTupleAlmostEqual(unproj_pt, world_pt)
+        # float32 depth through near=0.1/far=100 round-trips to ~1e-5 at 5 m;
+        # clang 22 with -ffast-math on Windows lands at 9e-6, past places=5.
+        self.assertTupleAlmostEqual(unproj_pt, world_pt, places=4)
 
     def test_intersect_ray_plane(self) -> None:
         # Ray straight down from (0, 10, 0)
