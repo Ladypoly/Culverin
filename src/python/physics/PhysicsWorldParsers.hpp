@@ -73,7 +73,8 @@ struct WorldParsers {
            Arg<"user_data", uint64_t, false>, Arg<"is_sensor", bool, false>,
            Arg<"category", uint32_t, false>, Arg<"mask", uint32_t, false>,
            Arg<"material_id", uint32_t, false>, Arg<"friction", float, false>,
-           Arg<"restitution", float, false>, Arg<"ccd", bool, false>>
+           Arg<"restitution", float, false>, Arg<"ccd", bool, false>,
+           Arg<"convex_radius", float, false>>
         convexHull{catalog};
     Parser<"Compound", Arg<"pos", PyObject *, true>, Arg<"rot", PyObject *, true>,
            Arg<"parts", PyObject *, true>, Arg<"motion", int, false>, Arg<"mass", float, false>,

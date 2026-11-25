@@ -444,7 +444,8 @@ std::expected<void, Error> PhysicsWorld::CreateBodiesBatch(
 
 std::expected<BodyHandle, Error>
 PhysicsWorld::CreateConvexHull(std::span<const float> points,
-                                 const PhysicsWorldBodyCreateRequest &request) {
+                                 const PhysicsWorldBodyCreateRequest &request,
+                                 float max_convex_radius) {
     if (points.size() % 3 != 0) {
         return std::unexpected(WorldCreationError::InvalidArgument);
     }
@@ -462,7 +463,8 @@ PhysicsWorld::CreateConvexHull(std::span<const float> points,
     }
 
     const JPH::ConvexHullShapeSettings hull_settings(
-        jolt_points.data(), static_cast<int>(point_count), kConvexHullTolerance);
+        jolt_points.data(), static_cast<int>(point_count),
+        max_convex_radius >= 0.0f ? max_convex_radius : kConvexHullTolerance);
     const auto shape_result = hull_settings.Create();
     if (!shape_result.IsValid()) {
         return std::unexpected(WorldCreationError::ShapeFailed);

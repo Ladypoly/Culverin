@@ -237,7 +237,11 @@ struct PhysicsWorld {
     void DestroyRagdoll(JPH::Ragdoll *ragdoll);
     // `points` is flat XYZ triples.
     [[nodiscard]] std::expected<BodyHandle, Error>
-    CreateConvexHull(std::span<const float> points, const PhysicsWorldBodyCreateRequest &request);
+    // `max_convex_radius` < 0 keeps Jolt's default. The radius rounds edges *inside*
+    // the hull, so sharp source vertices protrude past the collision surface by up to
+    // about radius * (sqrt(3) - 1); small values keep resting meshes visually on top.
+    CreateConvexHull(std::span<const float> points, const PhysicsWorldBodyCreateRequest &request,
+                     float max_convex_radius = -1.0f);
     [[nodiscard]] std::expected<BodyHandle, Error>
     CreateCompoundBody(std::span<const PhysicsWorldCompoundPart> parts,
                        const PhysicsWorldBodyCreateRequest &request);

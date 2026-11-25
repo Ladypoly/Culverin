@@ -1778,6 +1778,27 @@ class TestComplexShapes(CulverinTestCase):
         world.step(0)
         self.assertTrue(world.is_alive(mesh))
 
+    def test_convex_hull_convex_radius(self) -> None:
+        # The convex radius rounds corners *inside* the hull. A ray straight up at an
+        # octahedron's bottom tip (y = -1) hits it exactly with radius 0, and higher
+        # (later along the ray) with the 0.05 m default.
+        points = array.array("f", [1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1])
+
+        def hit(**kwargs: Any) -> float:
+            world = culverin.PhysicsWorld(settings={"max_bodies": 4})
+            world.create_convex_hull(pos=(0, 0, 0), rot=(0, 0, 0, 1), points=points,
+                                     motion=culverin.MOTION_STATIC, **kwargs)
+            world.step(0)
+            result = world.raycast((0, -5, 0), (0, 1, 0), 10.0)
+            self.assertIsNotNone(result)
+            return result[1]
+
+        sharp, rounded = hit(convex_radius=0.0), hit()
+        self.assertLess(sharp, rounded)
+        self.assertGreater((rounded - sharp) / sharp, 0.002)
+        with self.assertRaises(ValueError):
+            hit(convex_radius=-0.5)
+
 
 class TestPenetrationSlop(CulverinTestCase):
     def _resting_sink(self, slop: float) -> float:

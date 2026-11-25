@@ -788,13 +788,22 @@ template <PhysicsBodyOperationType OpType, auto ParserMember, FixedString Label>
     uint32_t material_id = 0;
     bool is_sensor       = false;
     bool use_ccd         = false;
+    float convex_radius  = -1.0f;  // -1 = unset: Jolt default (0.05 m)
 
     const ParseResult parsed =
         self->parsers->convexHull.Parse(
             args, PyVectorcall_NARGS(nargsf), kwnames, o_pos, o_rot, o_points, motion_type, mass,
-            user_data, is_sensor, category, mask, material_id, friction, restitution, use_ccd);
+            user_data, is_sensor, category, mask, material_id, friction, restitution, use_ccd,
+            convex_radius);
     if (!parsed) {
         RaiseParseError(parsed.error());
+        return nullptr;
+    }
+    if (convex_radius != -1.0f && (!ValidateFinite("convex_radius", convex_radius) ||
+                                   convex_radius < 0.0f)) {
+        if (!PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError, "convex_radius must be >= 0");
+        }
         return nullptr;
     }
 
@@ -850,7 +859,8 @@ template <PhysicsBodyOperationType OpType, auto ParserMember, FixedString Label>
     std::expected<BodyHandle, Error> status;
     {
         const AllowThreads allow;
-        status = self->physics.CreateConvexHull({packed_points.data(), num_points * 3}, request);
+        status = self->physics.CreateConvexHull({packed_points.data(), num_points * 3}, request,
+                                                convex_radius);
     }
 
     if (!status) {
