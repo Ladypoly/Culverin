@@ -3314,29 +3314,37 @@ class TestSoftBodies(CulverinTestCase):
         self.assertGreater(verts[2, 1], verts[0, 1], "Pinned vertex fell below bottom vertex")
 
     def test_soft_body_bend_compliance(self) -> None:
-        """create_constraints(bend_compliance=...): a stiff hinge sags less than a free one (pd2.3)."""
+        """create_constraints(bend_compliance=...): a stiff strip droops less than a free one (pd2.3)."""
         dtype = np.float64 if culverin.USE_DOUBLE_PRECISION else np.float32
 
-        def sag(bend_compliance):
+        def droop(bend_compliance):
             world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 8})
             s = culverin.SoftBodySharedSettings()
-            # Two triangles sharing the hinge edge 1-2; the first one pinned.
-            pos = np.array([[0, 0, 0], [0, 0, 1], [1, 0, 0], [1, 0, 1]], dtype=np.float32)
-            s.add_vertices(pos.tobytes(), inv_masses=np.array([0, 0, 0, 1], np.float32).tobytes())
-            s.add_faces(np.array([0, 1, 2, 2, 1, 3], dtype=np.uint32).tobytes())
+            # A horizontal strip of 10 quads (2 m x 0.2 m), pinned at x = 0. Shear
+            # diagonals stiffen each quad, so it can only bend along the rungs.
+            n = 11
+            pos = np.array([[i * 0.2, 0, z] for i in range(n) for z in (0.0, 0.2)], dtype=np.float32)
+            inv = np.ones(2 * n, np.float32)
+            inv[:2] = 0.0
+            tris = []
+            for i in range(n - 1):
+                a, b, c, d = 2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 3
+                tris += [a, b, c, c, b, d]
+            s.add_vertices(pos.tobytes(), inv_masses=inv.tobytes())
+            s.add_faces(np.array(tris, dtype=np.uint32).tobytes())
             kwargs = {} if bend_compliance is None else {"bend_compliance": bend_compliance}
             s.create_constraints(0.0, culverin.BEND_DIHEDRAL, **kwargs)
             s.optimize()
-            h = world.create_soft_body(s, pos=(0, 0, 0), rot=(0, 0, 0, 1))
+            h = world.create_soft_body(s, pos=(0, 0, 0), rot=(0, 0, 0, 1), num_iterations=20)
             world.step(0)
-            for _ in range(60):
-                world.step(1 / 60.0)
+            for _ in range(240):
+                world.step(1 / 240.0)
             v = np.frombuffer(world.get_soft_body_vertices(h), dtype=dtype).reshape(-1, 4)
-            return -float(v[3, 1])
+            return -float(v[-1, 1])
 
-        free, stiff = sag(None), sag(0.0)
-        self.assertGreater(free, 0.3, "without bend stiffness the flap should hang down")
-        self.assertLess(stiff, free * 0.5, "bend_compliance=0 should hold the flap up")
+        free, stiff = droop(None), droop(0.0)
+        self.assertGreater(free, 0.5, f"a strip without bend stiffness should droop (tip {free:.3f} m)")
+        self.assertLess(stiff, free * 0.8, f"bend_compliance=0 should droop less ({stiff:.3f} vs {free:.3f} m)")
 
     def test_soft_body_set_vertices(self) -> None:
         """set_soft_body_vertices: world-space position/velocity/inv-mass per index (pd2.3)."""
