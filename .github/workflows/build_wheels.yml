@@ -16,6 +16,8 @@ jobs:
     name: Build Jolt (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      # One platform failing (e.g. no macOS runner available) must not cancel the others.
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     outputs:
@@ -124,6 +126,9 @@ jobs:
   build_wheels:
     name: Release Build (${{ matrix.os }})
     needs: [build_jolt]
+    # Build every platform whose Jolt artifact exists; a missing one only fails
+    # its own leg at "Download prebuilt Jolt".
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
