@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <memory>
 #include <span>
 
@@ -63,7 +64,11 @@ class SoftBodySettings {
 
     // `bend_type` is a JPH::SoftBodySharedSettings::EBendType value; the range
     // check and its diagnostic belong to the caller.
-    [[nodiscard]] std::expected<void, Error> CreateConstraints(float compliance, int bend_type);
+    // bend_compliance: compliance of the bend constraints; FLT_MAX (the default)
+    // keeps Jolt's default, i.e. no bending resistance.
+    [[nodiscard]] std::expected<void, Error>
+    CreateConstraints(float compliance, int bend_type,
+                      float bend_compliance = std::numeric_limits<float>::max());
     [[nodiscard]] std::expected<void, Error> Optimize();
 
     [[nodiscard]] std::expected<JPH::Float3, Error> GetVertexPosition(std::uint32_t index) const;

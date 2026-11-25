@@ -107,7 +107,8 @@ std::expected<void, Error> SoftBodySettings::AddFaces(std::span<const std::uint3
     return {};
 }
 
-std::expected<void, Error> SoftBodySettings::CreateConstraints(float compliance, int bend_type) {
+std::expected<void, Error> SoftBodySettings::CreateConstraints(float compliance, int bend_type,
+                                                              float bend_compliance) {
     if (constraintsCreated_) {
         return std::unexpected(SoftBodySettingsError::ConstraintsAlreadyCreated);
     }
@@ -122,6 +123,7 @@ std::expected<void, Error> SoftBodySettings::CreateConstraints(float compliance,
     for (auto &attribute : attributes) {
         attribute.mCompliance      = compliance;
         attribute.mShearCompliance = compliance;
+        attribute.mBendCompliance  = bend_compliance;
     }
 
     settings_->CreateConstraints(attributes.data(), static_cast<JPH::uint>(attributes.size()),

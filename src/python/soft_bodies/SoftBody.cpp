@@ -11,6 +11,7 @@
 #include "bindings/PythonSupport.hpp"
 #include "bindings/parsing/Parsers.hpp"
 #include "core/Compiler.hpp"
+#include <limits>
 
 namespace CPH::Python {
 
@@ -328,16 +329,17 @@ static inline bool CheckBendType(int val, int max) {
     return ((val) >= 0 && (val) < (max));
 }
 
-// Method: settings.create_constraints(compliance, bend_type=1)
+// Method: settings.create_constraints(compliance, bend_type=1, bend_compliance=FLT_MAX)
 [[nodiscard]] PyObject *
 SoftBodySharedSettingsCreateConstraints(SoftBodySharedSettingsObject *self, PyObject *const *args,
                                         size_t nargsf, PyObject *kwnames) {
     const Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
     float compliance       = 0.0001f;
     int bend_type          = 1; // EBendType::Distance
+    float bend_compliance  = std::numeric_limits<float>::max(); // Jolt default: no bend stiffness
 
-    const ParseResult parsed =
-        self->parsers->sbssCreateConstraints.Parse(args, nargs, kwnames, compliance, bend_type);
+    const ParseResult parsed = self->parsers->sbssCreateConstraints.Parse(
+        args, nargs, kwnames, compliance, bend_type, bend_compliance);
     if (!parsed) {
         RaiseParseError(parsed.error());
         return nullptr;
@@ -350,7 +352,8 @@ SoftBodySharedSettingsCreateConstraints(SoftBodySharedSettingsObject *self, PyOb
     }
 
     const std::expected<void, Error> created =
-        self->settings->CreateConstraints(compliance, bend_type);
+        self->settings->CreateConstraints(compliance, bend_type,
+                                          bend_compliance >= 0.0f ? bend_compliance : 0.0f);
     if (!created) {
         PyErr_SetString(PyExc_RuntimeError, "create_constraints already called");
         return nullptr;

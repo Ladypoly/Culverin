@@ -18,7 +18,8 @@ struct SoftBodySharedSettingsParsers {
         sbssAddVertices{catalog};
     Parser<"SbssAddFaces", Arg<"indices", PyObject *, true>, Arg<"materials", PyObject *, false>>
         sbssAddFaces{catalog};
-    Parser<"SbssCreateConstraints", Arg<"compliance", float, true>, Arg<"bend_type", int, false>>
+    Parser<"SbssCreateConstraints", Arg<"compliance", float, true>, Arg<"bend_type", int, false>,
+           Arg<"bend_compliance", float, false>>
         sbssCreateConstraints{catalog};
 };
 

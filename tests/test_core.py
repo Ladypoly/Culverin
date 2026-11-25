@@ -3313,6 +3313,31 @@ class TestSoftBodies(CulverinTestCase):
         # The pinned vertex (2) should be physically higher than the mobile ones
         self.assertGreater(verts[2, 1], verts[0, 1], "Pinned vertex fell below bottom vertex")
 
+    def test_soft_body_bend_compliance(self) -> None:
+        """create_constraints(bend_compliance=...): a stiff hinge sags less than a free one (pd2.3)."""
+        dtype = np.float64 if culverin.USE_DOUBLE_PRECISION else np.float32
+
+        def sag(bend_compliance):
+            world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 8})
+            s = culverin.SoftBodySharedSettings()
+            # Two triangles sharing the hinge edge 1-2; the first one pinned.
+            pos = np.array([[0, 0, 0], [0, 0, 1], [1, 0, 0], [1, 0, 1]], dtype=np.float32)
+            s.add_vertices(pos.tobytes(), inv_masses=np.array([0, 0, 0, 1], np.float32).tobytes())
+            s.add_faces(np.array([0, 1, 2, 2, 1, 3], dtype=np.uint32).tobytes())
+            kwargs = {} if bend_compliance is None else {"bend_compliance": bend_compliance}
+            s.create_constraints(0.0, culverin.BEND_DIHEDRAL, **kwargs)
+            s.optimize()
+            h = world.create_soft_body(s, pos=(0, 0, 0), rot=(0, 0, 0, 1))
+            world.step(0)
+            for _ in range(60):
+                world.step(1 / 60.0)
+            v = np.frombuffer(world.get_soft_body_vertices(h), dtype=dtype).reshape(-1, 4)
+            return -float(v[3, 1])
+
+        free, stiff = sag(None), sag(0.0)
+        self.assertGreater(free, 0.3, "without bend stiffness the flap should hang down")
+        self.assertLess(stiff, free * 0.5, "bend_compliance=0 should hold the flap up")
+
     def test_soft_body_set_vertices(self) -> None:
         """set_soft_body_vertices: world-space position/velocity/inv-mass per index (pd2.3)."""
         settings = culverin.SoftBodySharedSettings()
