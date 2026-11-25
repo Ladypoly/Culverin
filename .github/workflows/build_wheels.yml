@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-2022, ubuntu-latest, macos-latest]
     outputs:
       jolt-hash: ${{ steps.jolt_hash.outputs.hash }}
     steps:
@@ -118,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-2022, ubuntu-latest, macos-latest]
 
     steps:
       - name: Checkout code
@@ -477,7 +477,7 @@ jobs:
           compiled = build_string.split(" ", 1)[0]
 
           wheels = sorted(glob.glob(str(repo / "dist" / "culverin-*.whl")))
-          wheel_versions = sorted({pathlib.Path(w).name.split("-")[1].split("+")[0] for w in wheels})
+          wheel_versions = sorted({pathlib.Path(w).name.split("-")[1] for w in wheels})
 
           print(f"pyproject.toml : {declared}")
           print(f"wheel metadata : {', '.join(wheel_versions) or '<none>'}")
