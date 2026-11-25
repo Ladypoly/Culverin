@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-2022, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
     outputs:
       jolt-hash: ${{ steps.jolt_hash.outputs.hash }}
     steps:
@@ -48,6 +48,16 @@ jobs:
       - name: Install ninja (Windows)
         if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
         run: choco install ninja
+
+      - name: Install LLVM 22+ (Windows)
+        if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: bash
+        run: |
+          # windows-latest ships Visual Studio 18 (MSVC STL 14.52), whose
+          # yvals_core.h rejects clang < 22 with STL1000.
+          choco upgrade llvm -y --no-progress
+          "/c/Program Files/LLVM/bin/clang" --version
+          test "$("/c/Program Files/LLVM/bin/clang" -dumpversion | cut -d. -f1)" -ge 22
 
       - name: Build Jolt
         if: steps.cache.outputs.cache-hit != 'true'
@@ -118,7 +128,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
 
     steps:
       - name: Checkout code
@@ -130,6 +140,15 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+
+      - name: Install LLVM 22+ (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # See build_jolt: VS 18's STL rejects clang < 22 (STL1000).
+          choco upgrade llvm -y --no-progress
+          "/c/Program Files/LLVM/bin/clang" --version
+          test "$("/c/Program Files/LLVM/bin/clang" -dumpversion | cut -d. -f1)" -ge 22
 
       - name: Install LLVM (macOS)
         if: runner.os == 'macOS'
