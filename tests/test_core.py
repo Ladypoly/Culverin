@@ -1779,25 +1779,30 @@ class TestComplexShapes(CulverinTestCase):
         self.assertTrue(world.is_alive(mesh))
 
     def test_convex_hull_convex_radius(self) -> None:
-        # The convex radius rounds corners *inside* the hull. A ray straight up at an
-        # octahedron's bottom tip (y = -1) hits it exactly with radius 0, and higher
-        # (later along the ray) with the 0.05 m default.
+        # The convex radius rounds corners *inside* the hull for collision (ray casts
+        # use the exact planes, so they cannot see it). A plate resting on four
+        # upward octahedron tips (tip at y = 1) sits on the true tips with radius 0
+        # and ~1.4 cm lower on the rounded tips with the 0.05 m default (measured
+        # 0.986; Jolt already lowers the radius for this sharp hull).
         points = array.array("f", [1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1])
 
-        def hit(**kwargs: Any) -> float:
-            world = culverin.PhysicsWorld(settings={"max_bodies": 4})
-            world.create_convex_hull(pos=(0, 0, 0), rot=(0, 0, 0, 1), points=points,
-                                     motion=culverin.MOTION_STATIC, **kwargs)
-            world.step(0)
-            result = world.raycast((0, -5, 0), (0, 1, 0), 10.0)
-            self.assertIsNotNone(result)
-            return result[1]
+        def plate_bottom(**kwargs: Any) -> float:
+            world = culverin.PhysicsWorld(
+                settings={"gravity": (0, -9.81, 0), "max_bodies": 8, "penetration_slop": 0.001})
+            for x, z in ((-3, -3), (-3, 3), (3, -3), (3, 3)):
+                world.create_convex_hull(pos=(x, 0, z), rot=(0, 0, 0, 1), points=points,
+                                         motion=culverin.MOTION_STATIC, **kwargs)
+            plate = world.create_body(pos=(0, 1.15, 0), size=(5, 0.1, 5), shape=culverin.SHAPE_BOX,
+                                      motion=culverin.MOTION_DYNAMIC, mass=10.0)
+            for _ in range(480):
+                world.step(1 / 240)
+            return world.get_position(plate)[1] - 0.1
 
-        sharp, rounded = hit(convex_radius=0.0), hit()
-        self.assertLess(sharp, rounded)
-        self.assertGreater((rounded - sharp) / sharp, 0.002)
+        sharp, rounded = plate_bottom(convex_radius=0.0), plate_bottom()
+        self.assertGreater(sharp, 0.99)
+        self.assertGreater(sharp - rounded, 0.005)
         with self.assertRaises(ValueError):
-            hit(convex_radius=-0.5)
+            plate_bottom(convex_radius=-0.5)
 
 
 class TestPenetrationSlop(CulverinTestCase):
