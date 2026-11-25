@@ -3320,12 +3320,12 @@ class TestSoftBodies(CulverinTestCase):
         def droop(bend_compliance):
             world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 8})
             s = culverin.SoftBodySharedSettings()
-            # A horizontal strip of 10 quads (2 m x 0.2 m), pinned at x = 0. Shear
-            # diagonals stiffen each quad, so it can only bend along the rungs.
+            # A horizontal strip of 10 quads (2 m x 0.2 m) with the first quad pinned.
+            # Shear diagonals stiffen each quad, so it can only bend along the rungs.
             n = 11
             pos = np.array([[i * 0.2, 0, z] for i in range(n) for z in (0.0, 0.2)], dtype=np.float32)
             inv = np.ones(2 * n, np.float32)
-            inv[:2] = 0.0
+            inv[:4] = 0.0          # first quad fixed: bending must hold the rest up
             tris = []
             for i in range(n - 1):
                 a, b, c, d = 2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 3
@@ -3342,9 +3342,11 @@ class TestSoftBodies(CulverinTestCase):
             v = np.frombuffer(world.get_soft_body_vertices(h), dtype=dtype).reshape(-1, 4)
             return -float(v[-1, 1])
 
+        # Linux pd2.3 wheel: free 0.816 m, bend_compliance=0 0.004 m. Intermediate values
+        # are mid-swing after 1 s and not monotonic, so only the ends are compared.
         free, stiff = droop(None), droop(0.0)
-        self.assertGreater(free, 0.5, f"a strip without bend stiffness should droop (tip {free:.3f} m)")
-        self.assertLess(stiff, free * 0.8, f"bend_compliance=0 should droop less ({stiff:.3f} vs {free:.3f} m)")
+        self.assertGreater(free, 0.3, f"a strip without bend stiffness should droop (tip {free:.3f} m)")
+        self.assertLess(stiff, 0.1, f"bend_compliance=0 should hold the strip up (tip {stiff:.3f} m)")
 
     def test_soft_body_set_vertices(self) -> None:
         """set_soft_body_vertices: world-space position/velocity/inv-mass per index (pd2.3)."""
