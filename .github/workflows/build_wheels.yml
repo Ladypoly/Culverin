@@ -61,16 +61,20 @@ jobs:
           # yvals_core.h rejects clang < 22 with STL1000.
           # chocolatey's feed returns 503/504 at times: retry, then fall back
           # to the official installer from LLVM's GitHub release.
-          ok=0
+          # choco can report "upgraded 1/1" after a failed download, so success
+          # means clang >= 22 actually being there.
+          have22() { v=$("/c/Program Files/LLVM/bin/clang" -dumpversion 2>/dev/null | cut -d. -f1); [ "${v:-0}" -ge 22 ]; }
           for i in 1 2 3; do
-            if choco upgrade llvm -y --no-progress; then ok=1; break; fi
+            choco upgrade llvm -y --no-progress || true
+            if have22; then break; fi
             sleep 30
           done
-          if [ "$ok" != 1 ]; then
+          if ! have22; then
             url=$(gh release view --repo llvm/llvm-project --json assets -q '.assets[].url' | grep -E '/LLVM-[0-9.]+-win64\.exe$' | head -1)
-            echo "chocolatey unavailable, installing $url"
+            echo "chocolatey unavailable, unpacking $url"
             curl -fsSL --retry 3 -o llvm-installer.exe "$url"
-            powershell -NoProfile -Command "Start-Process -Wait -FilePath .\llvm-installer.exe -ArgumentList '/S'"
+            mv "/c/Program Files/LLVM" "/c/Program Files/LLVM-old" || true
+            7z x -y -o"C:\Program Files\LLVM" llvm-installer.exe > /dev/null
           fi
           "/c/Program Files/LLVM/bin/clang" --version
           test "$("/c/Program Files/LLVM/bin/clang" -dumpversion | cut -d. -f1)" -ge 22
@@ -169,16 +173,20 @@ jobs:
           # See build_jolt: VS 18's STL rejects clang < 22 (STL1000).
           # chocolatey's feed returns 503/504 at times: retry, then fall back
           # to the official installer from LLVM's GitHub release.
-          ok=0
+          # choco can report "upgraded 1/1" after a failed download, so success
+          # means clang >= 22 actually being there.
+          have22() { v=$("/c/Program Files/LLVM/bin/clang" -dumpversion 2>/dev/null | cut -d. -f1); [ "${v:-0}" -ge 22 ]; }
           for i in 1 2 3; do
-            if choco upgrade llvm -y --no-progress; then ok=1; break; fi
+            choco upgrade llvm -y --no-progress || true
+            if have22; then break; fi
             sleep 30
           done
-          if [ "$ok" != 1 ]; then
+          if ! have22; then
             url=$(gh release view --repo llvm/llvm-project --json assets -q '.assets[].url' | grep -E '/LLVM-[0-9.]+-win64\.exe$' | head -1)
-            echo "chocolatey unavailable, installing $url"
+            echo "chocolatey unavailable, unpacking $url"
             curl -fsSL --retry 3 -o llvm-installer.exe "$url"
-            powershell -NoProfile -Command "Start-Process -Wait -FilePath .\llvm-installer.exe -ArgumentList '/S'"
+            mv "/c/Program Files/LLVM" "/c/Program Files/LLVM-old" || true
+            7z x -y -o"C:\Program Files\LLVM" llvm-installer.exe > /dev/null
           fi
           "/c/Program Files/LLVM/bin/clang" --version
           test "$("/c/Program Files/LLVM/bin/clang" -dumpversion | cut -d. -f1)" -ge 22
