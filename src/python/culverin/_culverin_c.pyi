@@ -292,6 +292,7 @@ class PhysicsWorld:
         friction: float = 0.2,
         restitution: float = 0.0,
         ccd: bool = False,
+        convex_radius: float = -1.0,
     ) -> int: ...
     def create_compound_body(
         self,
