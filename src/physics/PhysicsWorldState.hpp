@@ -245,7 +245,8 @@ struct PhysicsWorld {
     [[nodiscard]] std::expected<BodyHandle, Error>
     CreateMeshBody(std::span<const float> vertices, std::span<const std::uint32_t> indices,
                    JPH::RVec3 position, JPH::Quat rotation, std::uint32_t category,
-                   std::uint32_t mask, std::uint64_t user_data);
+                   std::uint32_t mask, std::uint64_t user_data, float friction = 0.2f,
+                   float restitution = 0.0f, std::uint32_t material_id = 0);
     [[nodiscard]] std::expected<BodyHandle, Error>
     CreateHeightfieldBody(std::span<const float> heights, std::size_t grid_size, JPH::Vec3 scale,
                           JPH::RVec3 position, JPH::Quat rotation, float friction, float restitution,

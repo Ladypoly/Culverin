@@ -1744,6 +1744,59 @@ class TestComplexShapes(CulverinTestCase):
                 pos=(0, 0, 0), rot=(0, 0, 0, 1), vertices=vertices, indices=invalid_indices
             )
 
+    def _slide_on_mesh_slope(self, **mesh_kwargs: Any) -> float:
+        """Box (friction 1.0) resting on a 30 degree static mesh slope; metres slid in 2 s."""
+        world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 16})
+        angle = math.radians(30)
+        q = (0.0, 0.0, math.sin(angle / 2), math.cos(angle / 2))  # tilt about Z
+        verts = array.array("f", [-5, 0, -5, 5, 0, -5, 5, 0, 5, -5, 0, 5])
+        world.create_mesh_body(pos=(0, 0, 0), rot=q, vertices=verts,
+                               indices=array.array("I", [0, 2, 1, 0, 3, 2]), **mesh_kwargs)
+        normal = (-math.sin(angle), math.cos(angle), 0.0)
+        box = world.create_body(pos=tuple(n * 0.25 for n in normal), rot=q, size=(0.25, 0.25, 0.25),
+                                shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC,
+                                mass=1.0, friction=1.0)
+        for _ in range(12):
+            world.step(1 / 240)
+        start = world.get_position(box)
+        for _ in range(480):
+            world.step(1 / 240)
+        return math.dist(start, world.get_position(box))
+
+    def test_mesh_body_friction(self) -> None:
+        # Geometric-mean combine: sqrt(1.0 * 0.2) = 0.45 < tan(30) = 0.58 slides;
+        # sqrt(1.0 * 1.0) = 1.0 holds. Unset friction keeps the old 0.2 default.
+        self.assertGreater(self._slide_on_mesh_slope(), 0.5)
+        self.assertLess(self._slide_on_mesh_slope(friction=1.0), 0.02)
+
+    def test_mesh_body_material_id(self) -> None:
+        world = culverin.PhysicsWorld(settings={"max_bodies": 4})
+        world.register_material(7, friction=1.0, restitution=0.0)
+        vertices = array.array("f", [0, 0, 0, 1, 0, 0, 0, 0, 1])
+        mesh = world.create_mesh_body(pos=(0, 0, 0), rot=(0, 0, 0, 1), vertices=vertices,
+                                      indices=array.array("I", [0, 2, 1]), material_id=7)
+        world.step(0)
+        self.assertTrue(world.is_alive(mesh))
+
+
+class TestPenetrationSlop(CulverinTestCase):
+    def _resting_sink(self, slop: float) -> float:
+        world = culverin.PhysicsWorld(
+            settings={"gravity": (0, -9.81, 0), "max_bodies": 32, "penetration_slop": slop})
+        world.create_body(pos=(0, -0.5, 0), size=(20, 0.5, 20), shape=culverin.SHAPE_BOX,
+                          motion=culverin.MOTION_STATIC)
+        boxes = [world.create_body(pos=(i * 2.0 - 8, h, 0), size=(0.5, 0.5, 0.5),
+                                   shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC, mass=1.0)
+                 for i, h in enumerate((1.0, 2.0, 3.0, 4.4, 6.0, 8.0))]
+        for _ in range(int(8 / (1 / 96))):
+            world.step(1 / 96)
+        return max(0.5 - world.get_position(b)[1] for b in boxes)
+
+    def test_penetration_slop_is_applied(self) -> None:
+        # Before the fix the setting was parsed but never reached Jolt, so the
+        # default 0.02 m always applied and resting boxes sank up to 2 cm.
+        self.assertLess(self._resting_sink(0.001), 0.003)
+
 
 class TestConstraints(CulverinTestCase):
     def test_hinge_constraint(self) -> None:

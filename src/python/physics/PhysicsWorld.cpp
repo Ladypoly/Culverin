@@ -1263,14 +1263,26 @@ static PhysicsWorldCompoundPart *ParseCompoundParts(PyObject *parts, size_t *out
     uint64_t user_data  = 0;
     uint32_t cat        = kCollisionFilterAllCategories;
     uint32_t mask       = kCollisionFilterAllMasks;
+    uint32_t material_id = 0;
+    float friction       = -1.0f;  // -1 = unset: material, else Jolt default 0.2
+    float restitution    = -1.0f;
 
     const ParseResult parsed =
         self->parsers->mesh.Parse(args, PyVectorcall_NARGS(nargsf), kwnames, o_pos, o_rot, o_verts,
-                                   o_indices, user_data, cat, mask);
+                                   o_indices, user_data, cat, mask, material_id, friction,
+                                   restitution);
     if (!parsed) {
         RaiseParseError(parsed.error());
         return nullptr;
     }
+    if (friction != -1.0f && !ValidateFinite("friction", friction)) {
+        return nullptr;
+    }
+    if (restitution != -1.0f && !ValidateFinite("restitution", restitution)) {
+        return nullptr;
+    }
+    const ResolvedMaterial resolved =
+        self->physics.ResolveMaterial(material_id, friction, restitution);
 
     // 2. VECTOR/QUAT EXTRACTION
     JPH::Real px;
@@ -1323,7 +1335,7 @@ static PhysicsWorldCompoundPart *ParseCompoundParts(PyObject *parts, size_t *out
         const AllowThreads allow;
         status = self->physics.CreateMeshBody({packed_vertices.data(), vertex_count * 3},
         {index_data, triangle_count * 3}, JPH::RVec3(px, py, pz), JPH::Quat(rx, ry, rz, rw), cat,
-        mask, user_data);
+        mask, user_data, resolved.friction, resolved.restitution, material_id);
     }
     if (!status && status.error().Code().Is(WorldCreationError::InvalidMeshIndex)) {
         return PyErr_Format(PyExc_ValueError, "Mesh index out of range");

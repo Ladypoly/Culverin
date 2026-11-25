@@ -273,6 +273,9 @@ class PhysicsWorld:
         user_data: int = 0,
         category: int = 0xFFFF,
         mask: int = 0xFFFF,
+        material_id: int = 0,
+        friction: float = -1.0,
+        restitution: float = -1.0,
     ) -> int: ...
     def create_convex_hull(
         self,

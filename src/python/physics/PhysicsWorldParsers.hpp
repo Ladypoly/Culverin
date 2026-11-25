@@ -61,7 +61,8 @@ struct WorldParsers {
     Parser<"Mesh", Arg<"pos", PyObject *, true>, Arg<"rot", PyObject *, true>,
            Arg<"vertices", PyObject *, true>, Arg<"indices", PyObject *, true>,
            Arg<"user_data", uint64_t, false>, Arg<"category", uint32_t, false>,
-           Arg<"mask", uint32_t, false>>
+           Arg<"mask", uint32_t, false>, Arg<"material_id", uint32_t, false>,
+           Arg<"friction", float, false>, Arg<"restitution", float, false>>
         mesh{catalog};
     Parser<"SetTrns", Arg<"handle", ParseBodyHandle, true>, Arg<"pos", PyObject *, true>,
            Arg<"rot", PyObject *, true>>

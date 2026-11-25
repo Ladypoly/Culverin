@@ -524,7 +524,8 @@ std::expected<BodyHandle, Error>
 PhysicsWorld::CreateMeshBody(std::span<const float> vertices,
                                std::span<const std::uint32_t> indices, JPH::RVec3 position,
                                JPH::Quat rotation, uint32_t category, uint32_t mask,
-                               uint64_t user_data) {
+                               uint64_t user_data, float friction, float restitution,
+                               uint32_t material_id) {
     if (vertices.size() % 3 != 0 || indices.size() % 3 != 0) {
         return std::unexpected(WorldCreationError::InvalidArgument);
     }
@@ -563,13 +564,18 @@ PhysicsWorld::CreateMeshBody(std::span<const float> vertices,
     const PhysicsWorldBodyCreateRequest request = {
         .position  = position,
         .rotation  = rotation,
-        .config    = {.motionType = std::to_underlying(MotionType::Static)},
+        .config    = {.friction    = friction,
+                      .restitution = restitution,
+                      .motionType  = std::to_underlying(MotionType::Static)},
         .category  = category,
         .mask      = mask,
+        .materialId = material_id,
         .userData = user_data,
     };
+    // MaterialOnly, like heightfields: static triangle meshes used to ignore
+    // friction/restitution entirely and always got Jolt's 0.2 / 0.0.
     return CreateBodyFromShape(*this, shape.GetPtr(), request, JPH::EMotionType::Static,
-                                  std::to_underlying(ObjectLayer::Static), BodySetup::None);
+                                  std::to_underlying(ObjectLayer::Static), BodySetup::MaterialOnly);
 }
 
 std::expected<BodyHandle, Error> PhysicsWorld::CreateHeightfieldBody(

@@ -644,6 +644,16 @@ bool PhysicsWorld::InitJolt(WorldSettings settings, JPH::Float3 gravity) {
                                broadphase_layer_interface, object_vs_broadphase_filter,
                                object_layer_pair_filter);
     physicsSystem.SetGravity(JPH::Vec3(gravity.x, gravity.y, gravity.z));
+
+    // penetration_slop was parsed from WorldSettings but never reached Jolt,
+    // so Jolt's 0.02 m default always applied and resting bodies kept up to
+    // 2 cm of uncorrected penetration.
+    if (settings.penetrationSlop >= 0.0F) {
+        JPH::PhysicsSettings physics_settings = physicsSystem.GetPhysicsSettings();
+        physics_settings.mPenetrationSlop = settings.penetrationSlop;
+        physicsSystem.SetPhysicsSettings(physics_settings);
+    }
+
     bodyInterface = &physicsSystem.GetBodyInterface();
     joltInitialized = true;
     return true;
