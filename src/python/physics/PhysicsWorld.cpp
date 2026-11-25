@@ -2240,6 +2240,69 @@ WorldGetSoftBodyLocalVertices(PhysicsWorldObject *self, PyObject *const *args,
         static_cast<Py_ssize_t>(positions.size() * sizeof(JPH::Float3)));
 }
 
+[[nodiscard]] PyObject *
+WorldSetSoftBodyVertices(PhysicsWorldObject *self, PyObject *const *args, size_t nargsf,
+                         PyObject *kwnames) {
+    uint64_t handle_raw  = 0;
+    PyObject *o_indices  = nullptr;
+    PyObject *o_pos      = nullptr;
+    PyObject *o_vel      = nullptr;
+    PyObject *o_inv_mass = nullptr;
+
+    const ParseResult parsed = self->parsers->setSoftVerts.Parse(
+        args, PyVectorcall_NARGS(nargsf), kwnames, handle_raw, o_indices, o_pos, o_vel, o_inv_mass);
+    if (!parsed) {
+        RaiseParseError(parsed.error());
+        return nullptr;
+    }
+
+    const auto ind_view = BufferView::Acquire(o_indices);
+    if (!ind_view) {
+        return nullptr;
+    }
+    if (ind_view->SizeBytes() % sizeof(std::uint32_t) != 0) {
+        return PyErr_Format(PyExc_ValueError, "indices must be uint32");
+    }
+    const std::size_t count = ind_view->SizeBytes() / sizeof(std::uint32_t);
+
+    auto optional_floats = [](PyObject *owner, std::size_t expected, const char *message,
+                              std::optional<BufferView> &out) -> bool {
+        if (owner == nullptr || owner == Py_None) {
+            return true;
+        }
+        out = BufferView::Acquire(owner);
+        if (!out) {
+            return false;
+        }
+        if (out->SizeBytes() != expected * sizeof(float)) {
+            PyErr_SetString(PyExc_ValueError, message);
+            return false;
+        }
+        return true;
+    };
+    std::optional<BufferView> pos_view;
+    std::optional<BufferView> vel_view;
+    std::optional<BufferView> mass_view;
+    if (!optional_floats(o_pos, count * 3, "positions must be float32 xyz, one per index", pos_view) ||
+        !optional_floats(o_vel, count * 3, "velocities must be float32 xyz, one per index", vel_view) ||
+        !optional_floats(o_inv_mass, count, "inv_masses must be float32, one per index", mass_view)) {
+        return nullptr;
+    }
+
+    const BodyHandle handle(handle_raw);
+    std::expected<void, Error> status;
+    {
+        const AllowThreads allow;
+        status = self->physics.SetSoftBodyVertices(
+            handle, ind_view->Uint32(), pos_view ? pos_view->Float32() : std::span<const float>{},
+            vel_view ? vel_view->Float32() : std::span<const float>{},
+            mass_view ? mass_view->Float32() : std::span<const float>{});
+    }
+    if (!status) {
+        return RuntimeStatusError(status.error(), nullptr);
+    }
+    Py_RETURN_NONE;
+}
 
 [[nodiscard]] PyObject * WorldGetSoftBodyVertices(PhysicsWorldObject *self,
                                                                     PyObject *const *args,
@@ -2774,6 +2837,7 @@ static PyMethodDef kPhysicsWorldMethods[] = {
     // --- Queries ---
     CPH::Python::FastCallMethod("get_soft_body_vertices", WorldGetSoftBodyVertices),
     CPH::Python::FastCallMethod("get_soft_body_vertex_count", WorldGetSoftBodyVertexCount),
+    CPH::Python::FastCallMethod("set_soft_body_vertices", WorldSetSoftBodyVertices),
     CPH::Python::FastCallMethod("get_soft_body_vertex_position",
                                 WorldGetSoftBodyVertexPosition),
     CPH::Python::FastCallMethod("get_soft_body_local_vertices",

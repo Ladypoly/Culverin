@@ -414,6 +414,79 @@ PhysicsWorld::GetSoftBodyLocalVertices(BodyHandle handle) {
         });
 }
 
+std::expected<void, Error>
+PhysicsWorld::SetSoftBodyVertices(BodyHandle handle, std::span<const std::uint32_t> indices,
+                                  std::span<const float> positions,
+                                  std::span<const float> velocities,
+                                  std::span<const float> inv_masses) {
+    if (!joltInitialized) {
+        return std::unexpected(WorldRuntimeError::InvalidArgument);
+    }
+    const std::size_t count = indices.size();
+    if ((!positions.empty() && positions.size() != count * 3) ||
+        (!velocities.empty() && velocities.size() != count * 3) ||
+        (!inv_masses.empty() && inv_masses.size() != count)) {
+        return std::unexpected(WorldRuntimeError::InvalidArgument);
+    }
+
+    JPH::BodyID body_id;
+    {
+        auto shadow = LockShadowNotStepping();
+        const std::optional<std::uint32_t> resolved = Resolve(handle);
+        if (!resolved) {
+            return std::unexpected(WorldRuntimeError::StaleHandle);
+        }
+        const std::uint32_t slot = *resolved;
+        const uint8_t state = (bodies.slotStates[slot]).load(std::memory_order::acquire);
+        if (!GetSlotPredicate(state, kMaskImmStrict).isImmediate) {
+            return std::unexpected(WorldRuntimeError::StaleHandle);
+        }
+        body_id = bodies.bodyIds[bodies.slotToDense[slot]];
+    }
+
+    {
+        const JPH::BodyLockWrite lock(physicsSystem.GetBodyLockInterface(), body_id);
+        if (!lock.Succeeded()) {
+            return std::unexpected(WorldRuntimeError::StaleHandle);
+        }
+        JPH::Body &body = lock.GetBody();
+        if (!body.IsSoftBody()) {
+            return std::unexpected(WorldRuntimeError::WrongBodyType);
+        }
+        auto *mp = static_cast<JPH::SoftBodyMotionProperties *>(body.GetMotionProperties());
+        JPH::Array<JPH::SoftBodyVertex> &vertices = mp->GetVertices();
+        const std::size_t vertex_count = vertices.size();
+        for (const std::uint32_t index : indices) {
+            if (index >= vertex_count) {
+                return std::unexpected(WorldRuntimeError::OutOfRange);
+            }
+        }
+        // Vertices live in the body's centre-of-mass frame (see
+        // GetSoftBodyVertexPosition), so world input is brought into it.
+        const JPH::RMat44 to_local = body.GetCenterOfMassTransform().InversedRotationTranslation();
+        const JPH::Quat inv_rotation = body.GetRotation().Conjugated();
+        for (std::size_t i = 0; i < count; ++i) {
+            JPH::SoftBodyVertex &v = vertices[indices[i]];
+            if (!positions.empty()) {
+                const JPH::RVec3 local =
+                    to_local * JPH::RVec3(positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]);
+                v.mPosition = JPH::Vec3(static_cast<float>(local.GetX()),
+                                        static_cast<float>(local.GetY()),
+                                        static_cast<float>(local.GetZ()));
+            }
+            if (!velocities.empty()) {
+                v.mVelocity = inv_rotation * JPH::Vec3(velocities[3 * i], velocities[3 * i + 1],
+                                                       velocities[3 * i + 2]);
+            }
+            if (!inv_masses.empty()) {
+                v.mInvMass = inv_masses[i] > 0.0f ? inv_masses[i] : 0.0f;
+            }
+        }
+    }
+    physicsSystem.GetBodyInterface().ActivateBody(body_id);
+    return {};
+}
+
 std::expected<bool, Error>
 PhysicsWorld::ApplyBuoyancy(BodyHandle handle, JPH::Real surface_y, float buoyancy,
                               float linear_drag, float angular_drag, JPH::Vec3 fluid_velocity,

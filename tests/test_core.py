@@ -3313,6 +3313,44 @@ class TestSoftBodies(CulverinTestCase):
         # The pinned vertex (2) should be physically higher than the mobile ones
         self.assertGreater(verts[2, 1], verts[0, 1], "Pinned vertex fell below bottom vertex")
 
+    def test_soft_body_set_vertices(self) -> None:
+        """set_soft_body_vertices: world-space position/velocity/inv-mass per index (pd2.3)."""
+        settings = culverin.SoftBodySharedSettings()
+        pos = np.array([[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]], dtype=np.float32)
+        settings.add_vertices(pos.tobytes())
+        settings.add_faces(np.array([0, 1, 2, 1, 3, 2], dtype=np.uint32).tobytes())
+        settings.create_constraints(0.001, culverin.BEND_DISTANCE)
+        settings.optimize()
+        h = self.world.create_soft_body(settings, pos=(0, 10, 0), rot=(0, 0, 0, 1))
+        self.world.step(0)
+        dtype = np.float64 if culverin.USE_DOUBLE_PRECISION else np.float32
+
+        # Pin vertex 0 and put it at a world position; it must stay there.
+        idx = np.array([0], dtype=np.uint32)
+        target = np.array([0.0, 12.0, 0.0], dtype=np.float32)
+        self.world.set_soft_body_vertices(h, idx.tobytes(), positions=target.tobytes(),
+                                          inv_masses=np.zeros(1, np.float32).tobytes())
+        for _ in range(30):
+            self.world.step(1 / 60.0)
+        verts = np.frombuffer(self.world.get_soft_body_vertices(h), dtype=dtype).reshape(-1, 4)
+        self.assertAlmostEqual(float(verts[0, 1]), 12.0, places=3)
+        self.assertLess(float(verts[3, 1]), 12.0, "free vertices should hang below the pinned one")
+
+        # Velocity on a free vertex moves it that way.
+        x_before = float(verts[3, 0])
+        self.world.set_soft_body_vertices(h, np.array([3], np.uint32).tobytes(),
+                                          velocities=np.array([20.0, 0, 0], np.float32).tobytes())
+        self.world.step(1 / 60.0)
+        verts = np.frombuffer(self.world.get_soft_body_vertices(h), dtype=dtype).reshape(-1, 4)
+        self.assertGreater(float(verts[3, 0]), x_before)
+
+        # Validation
+        with self.assertRaises(Exception):
+            self.world.set_soft_body_vertices(h, np.array([99], np.uint32).tobytes(),
+                                              velocities=np.zeros(3, np.float32).tobytes())
+        with self.assertRaises(ValueError):
+            self.world.set_soft_body_vertices(h, idx.tobytes(), positions=np.zeros(2, np.float32).tobytes())
+
     def test_deprecated_pinning(self) -> None:
         """Verify add_pinned_vertex emits a warning and does not crash."""
         settings = culverin.SoftBodySharedSettings()

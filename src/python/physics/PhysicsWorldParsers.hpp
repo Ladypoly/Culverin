@@ -41,6 +41,10 @@ struct WorldParsers {
            Arg<"py", JPH::Real, true>, Arg<"pz", JPH::Real, true>>
         impulseAt{catalog};
     Parser<"HOnly", Arg<"handle", ParseBodyHandle, true>> hOnly{catalog};
+    Parser<"SetSoftVerts", Arg<"handle", ParseBodyHandle, true>, Arg<"indices", PyObject *, true>,
+           Arg<"positions", PyObject *, false>, Arg<"velocities", PyObject *, false>,
+           Arg<"inv_masses", PyObject *, false>>
+        setSoftVerts{catalog};
     Parser<"Destroy", Arg<"handle", ParseBodyHandle, true>> destroy{catalog};
     Parser<"Activate", Arg<"handle", ParseBodyHandle, true>> activate{catalog};
     Parser<"Gravity", Arg<"x", float, true>, Arg<"y", float, true>, Arg<"z", float, true>> gravity{

@@ -284,6 +284,13 @@ struct PhysicsWorld {
     GetSoftBodyVertexPosition(BodyHandle handle, std::uint32_t vertex_index);
     [[nodiscard]] std::expected<Buffer<JPH::Float3>, Error>
     GetSoftBodyLocalVertices(BodyHandle handle);
+    // Overwrites selected vertices of a soft body (world-space positions and
+    // velocities, inverse masses); empty spans leave that field alone. Indices
+    // are validated before anything is written. Wakes the body.
+    [[nodiscard]] std::expected<void, Error>
+    SetSoftBodyVertices(BodyHandle handle, std::span<const std::uint32_t> indices,
+                        std::span<const float> positions, std::span<const float> velocities,
+                        std::span<const float> inv_masses);
     // Returns whether the body is submerged; a stale handle reports
     // "not submerged" rather than an error (legacy behavior).
     [[nodiscard]] std::expected<bool, Error>
