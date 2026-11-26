@@ -3340,7 +3340,8 @@ class TestSoftBodies(CulverinTestCase):
         pose with the motor and hangs down without it."""
         def droop(motor):
             world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 8})
-            base = world.create_body(pos=(0, 5, 0), rot=(0, 0, 0, 1), size=(0.1, 0.1, 0.1),
+            # base kept clear of the arm: touching, its contact held the "limp" arm up
+            base = world.create_body(pos=(-0.4, 5, 0), rot=(0, 0, 0, 1), size=(0.1, 0.1, 0.1),
                                      shape=culverin.SHAPE_BOX, motion=culverin.MOTION_STATIC)
             arm = world.create_body(pos=(0.6, 5, 0), rot=(0, 0, 0, 1), size=(0.5, 0.05, 0.05),
                                     shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC, mass=2.0)
