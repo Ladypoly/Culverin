@@ -54,6 +54,12 @@ struct ConstraintParams {
     // Swing-twist: plane axis (perpendicular to the twist axis) and its half cone.
     float nx = 1.0F, ny = 0.0F, nz = 0.0F;
     float planeHalfConeAngle = 0.0F;
+    // Swing-twist extras: joint friction (N m, when no motor drives it) and a position
+    // motor holding the creation pose (frequency 0 = off).
+    float frictionTorque = 0.0F;
+    float motorFrequency = 0.0F;
+    float motorDamping   = 1.0F;
+    float motorTorque    = std::numeric_limits<float>::max();
     bool hasMotor        = false;
     int motorType        = 0;
     float motorTarget    = 0.0F;

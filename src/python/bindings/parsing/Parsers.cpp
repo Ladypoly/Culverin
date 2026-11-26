@@ -247,10 +247,12 @@ ParseResult ParseSwingTwistParams(Borrowed args, ConstraintParams &params) {
         return {};
     }
     // (Pivot), (TwistAxis), (PlaneAxis), NormalHalfCone, PlaneHalfCone, TwistMin, TwistMax
-    if (PyArg_ParseTuple(args, "(fff)(fff)(fff)ffff", &params.px, &params.py, &params.pz,
+    // [, FrictionTorque, MotorFrequency, MotorDamping, MotorTorqueLimit]
+    if (PyArg_ParseTuple(args, "(fff)(fff)(fff)ffff|ffff", &params.px, &params.py, &params.pz,
                          &params.ax, &params.ay, &params.az, &params.nx, &params.ny, &params.nz,
                          &params.halfConeAngle, &params.planeHalfConeAngle, &params.limitMin,
-                         &params.limitMax) == 0) {
+                         &params.limitMax, &params.frictionTorque, &params.motorFrequency,
+                         &params.motorDamping, &params.motorTorque) == 0) {
         return CaptureFailure();
     }
     return {};

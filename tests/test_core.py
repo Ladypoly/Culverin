@@ -3335,6 +3335,27 @@ class TestSoftBodies(CulverinTestCase):
         with self.assertRaises(IndexError):
             world.group_filter_disable_collision(f, 0, 5)
 
+    def test_swing_twist_motor_holds_pose(self) -> None:
+        """Swing-twist position motor (pd2.6): a horizontal arm on a fixed shoulder holds its
+        pose with the motor and hangs down without it."""
+        def droop(motor):
+            world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 8})
+            base = world.create_body(pos=(0, 5, 0), rot=(0, 0, 0, 1), size=(0.1, 0.1, 0.1),
+                                     shape=culverin.SHAPE_BOX, motion=culverin.MOTION_STATIC)
+            arm = world.create_body(pos=(0.6, 5, 0), rot=(0, 0, 0, 1), size=(0.5, 0.05, 0.05),
+                                    shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC, mass=2.0)
+            world.step(0)
+            extra = (0.0, 4.0, 1.0, 1000.0) if motor else (0.0, 0.0, 1.0, 0.0)
+            world.create_constraint(culverin.CONSTRAINT_SWING_TWIST, base, arm,
+                                    params=((0.1, 5, 0), (1, 0, 0), (0, 1, 0), 1.5, 1.5, -0.5, 0.5) + extra)
+            for _ in range(240):
+                world.step(1 / 120.0)
+            return 5.0 - world.get_position(arm)[1]
+
+        limp, stiff = droop(False), droop(True)
+        self.assertGreater(limp, 0.3, f"without a motor the arm should hang ({limp:.3f} m)")
+        self.assertLess(stiff, limp * 0.3, f"the motor should hold the arm up ({stiff:.3f} vs {limp:.3f} m)")
+
     def test_swing_twist_ragdoll_chain(self) -> None:
         """CONSTRAINT_SWING_TWIST + constraint slots scale with max_bodies (pd2.5).
 

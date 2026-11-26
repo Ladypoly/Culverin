@@ -158,7 +158,24 @@ JPH::Constraint *CreateSwingTwist(const ConstraintParams &p, JPH::Body &body1,
     s.mPlaneHalfConeAngle  = p.planeHalfConeAngle;
     s.mTwistMinAngle       = p.limitMin;
     s.mTwistMaxAngle       = p.limitMax;
-    return s.Create(body1, body2);
+    s.mMaxFrictionTorque   = p.frictionTorque > 0.0f ? p.frictionTorque : 0.0f;
+    const bool motor = p.motorFrequency > 0.0f;
+    if (motor) {
+        // Position motor: a spring (frequency, damping) pulling body 2 back to its
+        // orientation relative to body 1 at creation, at most motorTorque N m.
+        JPH::MotorSettings ms(p.motorFrequency, p.motorDamping > 0.0f ? p.motorDamping : 0.0f);
+        ms.SetTorqueLimit(p.motorTorque > 0.0f ? p.motorTorque : 0.0f);
+        s.mSwingMotorSettings = ms;
+        s.mTwistMotorSettings = ms;
+    }
+    JPH::Constraint *created = s.Create(body1, body2);
+    if (motor && created != nullptr) {
+        auto *st = static_cast<JPH::SwingTwistConstraint *>(created);
+        st->SetSwingMotorState(JPH::EMotorState::Position);
+        st->SetTwistMotorState(JPH::EMotorState::Position);
+        st->SetTargetOrientationCS(JPH::Quat::sIdentity());
+    }
+    return created;
 }
 
 JPH::Constraint *CreateCone(const ConstraintParams &p, JPH::Body &body1, JPH::Body &body2) {
