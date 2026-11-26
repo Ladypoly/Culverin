@@ -36,4 +36,21 @@ inline std::string_view ErrorMessage(ConstraintError) noexcept {
                                                               ConstraintHandle handle,
                                                               float            target);
 
+// Live update of a swing-twist constraint (pd2.7): cone and twist limits, and, when
+// `setMotor`, its position motor (frequency 0 turns it off; the target stays the
+// creation pose). Fails for a stale handle or another constraint type.
+struct SwingTwistUpdate {
+    float normalHalfCone = 0.0F;
+    float planeHalfCone  = 0.0F;
+    float twistMin       = 0.0F;
+    float twistMax       = 0.0F;
+    bool  setMotor       = false;
+    float motorFrequency = 0.0F;
+    float motorDamping   = 1.0F;
+    float motorTorque    = 0.0F;
+};
+[[nodiscard]] std::expected<void, Error> SetSwingTwist(PhysicsWorld           &world,
+                                                        ConstraintHandle        handle,
+                                                        const SwingTwistUpdate &update);
+
 } // namespace CPH

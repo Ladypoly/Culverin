@@ -2990,6 +2990,7 @@ static PyMethodDef kPhysicsWorldMethods[] = {
     CPH::Python::FastCallMethod("set_collision_filter", WorldSetCollisionFilter),
     CPH::Python::FastCallMethod("register_material", WorldRegisterMaterial),
     CPH::Python::FastCallMethod("set_constraint_target", WorldSetConstraintTarget),
+    CPH::Python::FastCallMethod("set_swing_twist", WorldSetSwingTwist),
 
     // --- Motion Control ---
     CPH::Python::FastCallMethod("get_motion_type", WorldGetMotionType),

@@ -3357,6 +3357,41 @@ class TestSoftBodies(CulverinTestCase):
         self.assertGreater(limp, 0.3, f"without a motor the arm should hang ({limp:.3f} m)")
         self.assertLess(stiff, limp * 0.3, f"the motor should hold the arm up ({stiff:.3f} vs {limp:.3f} m)")
 
+    def test_swing_twist_live_update(self) -> None:
+        """set_swing_twist (pd2.7): a limp arm hangs; turning its motor on afterwards lifts
+        it back to the creation pose, and turning it off lets it hang again."""
+        world = culverin.PhysicsWorld(settings={"gravity": (0, -9.81, 0), "max_bodies": 8})
+        base = world.create_body(pos=(0, 5, 0), rot=(0, 0, 0, 1), size=(0.1, 0.1, 0.1),
+                                 shape=culverin.SHAPE_BOX, motion=culverin.MOTION_STATIC)
+        arm = world.create_body(pos=(0.6, 5, 0), rot=(0, 0, 0, 1), size=(0.5, 0.05, 0.05),
+                                shape=culverin.SHAPE_BOX, motion=culverin.MOTION_DYNAMIC, mass=2.0)
+        world.step(0)
+        h = world.create_constraint(culverin.CONSTRAINT_SWING_TWIST, base, arm,
+                                    params=((0.1, 5, 0), (1, 0, 0), (0, 1, 0), 1.5, 1.5, -0.5, 0.5))
+
+        def run():
+            for _ in range(240):
+                world.step(1 / 120.0)
+            return 5.0 - world.get_position(arm)[1]
+
+        limp = run()
+        world.set_swing_twist(h, 1.5, 1.5, -0.5, 0.5, 4.0, 1.0, 1000.0)
+        held = run()
+        world.set_swing_twist(h, 1.5, 1.5, -0.4, 0.4, 0.0, 1.0, 0.0)
+        limp_again = run()
+        self.assertGreater(limp, 0.3, f"limp arm should hang ({limp:.3f} m)")
+        self.assertLess(held, limp * 0.3, f"motor turned on later should lift it ({held:.3f} vs {limp:.3f} m)")
+        self.assertGreater(limp_again, 0.3, f"motor off should let it hang again ({limp_again:.3f} m)")
+        world.set_swing_twist(h, 0.5, 0.5, -0.1, 0.1)                  # limits only
+        gone = world.create_constraint(culverin.CONSTRAINT_SWING_TWIST, base, arm,
+                                       params=((0.1, 5, 0), (1, 0, 0), (0, 1, 0), 1.5, 1.5, -0.5, 0.5))
+        world.destroy_constraint(gone)
+        world.step(0)
+        with self.assertRaises(ValueError):
+            world.set_swing_twist(gone, 1.0, 1.0, -0.5, 0.5)
+        with self.assertRaises(TypeError):
+            world.set_swing_twist(h, 1.0)
+
     def test_swing_twist_ragdoll_chain(self) -> None:
         """CONSTRAINT_SWING_TWIST + constraint slots scale with max_bodies (pd2.5).
 

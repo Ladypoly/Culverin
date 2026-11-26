@@ -17,6 +17,11 @@ namespace CPH::Python {
                                                                     size_t nargsf,
                                                                     PyObject *kwnames);
 
+[[nodiscard]] PyObject * WorldSetSwingTwist(PhysicsWorldObject *self,
+                                              PyObject *const *args,
+                                              size_t nargsf,
+                                              PyObject *kwnames);
+
 [[nodiscard]] PyObject * WorldGetConstraintType(PhysicsWorldObject *self,
                                                                   PyObject *const *args,
                                                                   size_t nargsf, PyObject *kwnames);

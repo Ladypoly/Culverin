@@ -233,6 +233,54 @@ void ActivateBody(JPH::BodyInterface &bi, JPH::Body *body) {
     Py_RETURN_NONE;
 }
 
+// set_swing_twist(handle, normal_half_cone, plane_half_cone, twist_min, twist_max
+//                 [, motor_frequency, motor_damping, motor_torque])   (pd2.7)
+[[nodiscard]] PyObject * WorldSetSwingTwist(PhysicsWorldObject *self,
+                                              PyObject *const *args,
+                                              size_t nargsf,
+                                              PyObject *kwnames) {
+    const Py_ssize_t n = PyVectorcall_NARGS(nargsf);
+    if ((kwnames != nullptr && PyTuple_GET_SIZE(kwnames) > 0) || (n != 5 && n != 8)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "set_swing_twist(handle, normal_half_cone, plane_half_cone, twist_min, "
+                        "twist_max[, motor_frequency, motor_damping, motor_torque]) takes 5 or 8 "
+                        "positional arguments");
+        return nullptr;
+    }
+    const unsigned long long h_raw = PyLong_AsUnsignedLongLong(args[0]);
+    if (h_raw == static_cast<unsigned long long>(-1) && PyErr_Occurred() != nullptr) {
+        return nullptr;
+    }
+    float v[7] = {0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F};
+    for (Py_ssize_t i = 1; i < n; ++i) {
+        const double d = PyFloat_AsDouble(args[i]);
+        if (d == -1.0 && PyErr_Occurred() != nullptr) {
+            return nullptr;
+        }
+        v[i - 1] = static_cast<float>(d);
+    }
+    CPH::SwingTwistUpdate u;
+    u.normalHalfCone = v[0];
+    u.planeHalfCone  = v[1];
+    u.twistMin       = v[2];
+    u.twistMax       = v[3];
+    u.setMotor       = n == 8;
+    u.motorFrequency = v[4];
+    u.motorDamping   = v[5];
+    u.motorTorque    = v[6];
+
+    std::expected<void, CPH::Error> applied;
+    {
+        const AllowThreads allow;
+        applied = CPH::SetSwingTwist(self->physics, ConstraintHandle(static_cast<uint64_t>(h_raw)), u);
+    }
+    if (!applied) {
+        PyErr_SetString(PyExc_ValueError, "Invalid or stale handle, or not a swing-twist constraint");
+        return nullptr;
+    }
+    Py_RETURN_NONE;
+}
+
 [[nodiscard]] PyObject * WorldGetConstraintType(PhysicsWorldObject *self,
                                                                   PyObject *const *args,
                                                                   size_t nargsf,

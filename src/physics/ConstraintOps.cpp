@@ -3,6 +3,7 @@
 
 #include <Jolt/Physics/Constraints/HingeConstraint.h>
 #include <Jolt/Physics/Constraints/SliderConstraint.h>
+#include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 #include <Jolt/Physics/Constraints/TwoBodyConstraint.h>
 
 namespace CPH {
@@ -83,6 +84,47 @@ std::expected<void, Error> SetConstraintTarget(PhysicsWorld   &world,
         ActivateBody(bodies, two_body->GetBody1());
         ActivateBody(bodies, two_body->GetBody2());
     }
+    return {};
+}
+
+std::expected<void, Error> SetSwingTwist(PhysicsWorld           &world,
+                                         ConstraintHandle        handle,
+                                         const SwingTwistUpdate &u) {
+    std::unique_lock shadow(world.shadowLock);
+    WaitUntilNotStepping(shadow, world);
+
+    const std::uint32_t slot = handle.Index();
+    if (slot >= world.constraints.size() ||
+        world.constraints[slot].generation != handle.Generation() ||
+        world.constraints[slot].state.load(std::memory_order::relaxed) !=
+            std::to_underlying(SlotState::Alive)) [[unlikely]] {
+        return std::unexpected(ConstraintError::InvalidHandle);
+    }
+    JPH::Constraint *constraint = world.constraints[slot].constraint;
+    if (constraint->GetSubType() != JPH::EConstraintSubType::SwingTwist) [[unlikely]] {
+        return std::unexpected(ConstraintError::InvalidHandle);
+    }
+    auto *st = static_cast<JPH::SwingTwistConstraint *>(constraint);
+    st->SetNormalHalfConeAngle(u.normalHalfCone);
+    st->SetPlaneHalfConeAngle(u.planeHalfCone);
+    st->SetTwistMinAngle(u.twistMin);
+    st->SetTwistMaxAngle(u.twistMax);
+    if (u.setMotor) {
+        if (u.motorFrequency > 0.0f) {
+            JPH::MotorSettings ms(u.motorFrequency, u.motorDamping > 0.0f ? u.motorDamping : 0.0f);
+            ms.SetTorqueLimit(u.motorTorque > 0.0f ? u.motorTorque : 0.0f);
+            st->GetSwingMotorSettings() = ms;
+            st->GetTwistMotorSettings() = ms;
+            st->SetSwingMotorState(JPH::EMotorState::Position);
+            st->SetTwistMotorState(JPH::EMotorState::Position);
+        } else {
+            st->SetSwingMotorState(JPH::EMotorState::Off);
+            st->SetTwistMotorState(JPH::EMotorState::Off);
+        }
+    }
+    JPH::BodyInterface &bodies = world.physicsSystem.GetBodyInterface();
+    ActivateBody(bodies, st->GetBody1());
+    ActivateBody(bodies, st->GetBody2());
     return {};
 }
 
